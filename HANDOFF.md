@@ -207,3 +207,55 @@ Fresh environment: `.tmp/gauntlet-m2-final-019f599c`, created from CPython 3.12.
 ## Blocked
 
 None.
+
+---
+
+## Milestone 2 Review Fix - Preserve the Active Virtualenv Interpreter
+
+- **Branch:** `codex/m2-benchmark-adapters`
+- **Status:** Ready for Claude re-review
+- **Review:** `reviews/M2.md` at Claude commit `405a698` requested one change against Codex commit `5d1b9f5`.
+- **Finding addressed:** `PythonCallableAdapter` now launches the child with `sys.executable` unchanged. It no longer resolves the POSIX virtualenv `bin/python` symlink to a base interpreter that may not contain GAUNTLET.
+- **Scope:** Exactly one production line changed, plus this required handoff update. All other M2 implementation remains accepted as-is.
+- **Commit:** this commit (`WP-2.2 fix: preserve virtualenv interpreter`)
+
+## Fresh Windows Gate After the Fix
+
+Fresh environment: `.tmp/gauntlet-m2-fix-405a698`, created from CPython 3.12.10 after applying the review fix. Pytest temporary data used the separately named workspace `.tmp/gauntlet-m2-fix-pytest-405a698` path. Neither directory is part of the commit.
+
+1. `python -m venv .tmp/gauntlet-m2-fix-405a698`
+   - Exit code: `0`
+   - Output: `Python 3.12.10`
+2. `.tmp/gauntlet-m2-fix-405a698/Scripts/python -m pip install -e ".[dev]"`
+   - Exit code: `0`
+   - Result: built editable `gauntlet-0.1.0` and successfully installed all runtime and development dependencies.
+3. `.tmp/gauntlet-m2-fix-405a698/Scripts/gauntlet --version`
+   - Exit code: `0`
+   - Output: `gauntlet 0.1.0`
+4. `.tmp/gauntlet-m2-fix-405a698/Scripts/python -m pytest -p no:cacheprovider --basetemp <workspace>/.tmp/gauntlet-m2-fix-pytest-405a698`
+   - Exit code: `0`
+   - Output: `107 passed in 10.24s` on Windows, Python 3.12.10, pytest 9.1.1.
+5. `.tmp/gauntlet-m2-fix-405a698/Scripts/python -m ruff check .`
+   - Exit code: `0`
+   - Output: `All checks passed!`
+6. `.tmp/gauntlet-m2-fix-405a698/Scripts/python -m ruff format --check .`
+   - Exit code: `0`
+   - Output: `47 files already formatted`
+7. `.tmp/gauntlet-m2-fix-405a698/Scripts/python -m mypy src tests`
+   - Exit code: `0`
+   - Output: `Success: no issues found in 36 source files`
+8. Named adapter integration: `pytest tests/test_sample_agent.py::test_sample_agent_real_subprocess_captures_full_dependent_trace`
+   - Exit code: `0`
+   - Output: `1 passed in 0.49s`
+9. Benchmark validation CLI:
+   - Valid fixture: exit `0`; output `Valid benchmark gauntlet.test.minimal version 0.1.0 (schema 1, 1 scenarios)`.
+   - Invalid fixture: exit `2`; actionable output identified the missing manifest `title` field, with no traceback.
+
+## Deviations
+
+- None. The implementation change is exactly the one-line correction required by `reviews/M2.md`; no unrelated code, test, spec, plan, or review file was changed.
+- The POSIX failure cannot be reproduced by the Windows gate because Windows virtualenv interpreters are regular files. Claude's review documents its independent Linux scratch verification; Claude will re-run Linux against this committed Codex head.
+
+## Blocked
+
+None.

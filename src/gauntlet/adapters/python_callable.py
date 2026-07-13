@@ -280,7 +280,7 @@ class PythonCallableAdapter:
 
         # Safe-path/no-user-site preserve our controlled PYTHON* settings; -I would ignore them.
         command = [
-            str(Path(sys.executable).resolve()),
+            sys.executable,
             "-P",
             "-s",
             "-m",
