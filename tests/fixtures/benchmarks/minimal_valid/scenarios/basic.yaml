@@ -1,0 +1,19 @@
+id: test.basic
+title: Basic tool-use scenario
+description: Exercises the minimal invoke and tool-trace capability set.
+category: correctness
+difficulty: 1
+tags:
+  - smoke
+required_capabilities:
+  - invoke
+  - trace_tool_calls
+input:
+  user: Return the configured answer.
+fixtures:
+  tool_sequence: []
+execution_policy:
+  timeout_seconds: 5
+assertions: []
+metrics:
+  - task_success

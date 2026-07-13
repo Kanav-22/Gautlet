@@ -1,0 +1,11 @@
+id: gauntlet.test.invalid
+version: 0.1.0
+description: This manifest intentionally omits the required title field.
+schema_version: 1
+required_capabilities:
+  - invoke
+dimensions:
+  - correctness
+scenarios:
+  - scenarios/basic.yaml
+scoring_policy: scoring.yaml

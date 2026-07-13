@@ -8,6 +8,7 @@ from typing import Annotated, Never
 import typer
 
 from gauntlet import __version__
+from gauntlet.benchmarks import BenchmarkPackError, load_benchmark_pack
 from gauntlet.config.loader import ARTIFACT_ROOT_ENV
 from gauntlet.evidence.store import (
     ArtifactCorruptionError,
@@ -23,6 +24,8 @@ app = typer.Typer(
 
 runs_app = typer.Typer(help="Inspect locally stored evaluation runs.", no_args_is_help=True)
 app.add_typer(runs_app, name="runs")
+benchmark_app = typer.Typer(help="Validate and inspect benchmark packs.", no_args_is_help=True)
+app.add_typer(benchmark_app, name="benchmark")
 
 
 def _version_callback(value: bool) -> None:
@@ -126,6 +129,24 @@ node_modules/
         Path(".gauntlet/adapters/python_callable.py"): adapter,
         Path(".gauntletignore"): ignore,
     }
+
+
+@benchmark_app.command("validate")
+def validate_benchmark(
+    path: Annotated[
+        Path,
+        typer.Argument(help="Benchmark directory or manifest YAML file."),
+    ],
+) -> None:
+    """Validate a benchmark manifest, its scenarios, and pack references."""
+    try:
+        benchmark = load_benchmark_pack(path)
+    except BenchmarkPackError as error:
+        _configuration_error(str(error))
+    typer.echo(
+        f"Valid benchmark {benchmark.identity.id} version {benchmark.identity.version} "
+        f"(schema {benchmark.identity.schema_version}, {len(benchmark.scenarios)} scenarios)"
+    )
 
 
 @app.command("init")
