@@ -58,22 +58,57 @@ None.
 ## Milestone 1 - Config, Schemas, and Run Artifacts
 
 - **Branch:** `codex/m1-core-artifacts`
-- **Status:** Blocked before WP-1.1 implementation
+- **Status:** Ready for Claude review
 - **Authorization:** M1 authorization in `reviews/M0.md` at architect commit `e097482`, merged at `c82a6e1`
 
 ## Work Packages Completed
 
-None. A draft model file was removed before commit after the cross-spec conflicts below were confirmed. No partial WP implementation is retained or claimed.
+- **WP-1.1:** Added strict Pydantic domain/config models, the reconciled dimension and timeout vocabulary, deterministic JSON Schema export, and schema round-trip/boundary tests.
+  - Commit: 63b3031 (WP-1.1: add validated domain schemas)
+- **WP-1.2:** Added safe YAML/mapping loading, deep five-level precedence resolution, typed environment overrides including GAUNTLET_ARTIFACT_ROOT, atomic config.resolved.yaml persistence, and comprehensive precedence tests.
+  - Commit: 42cec75 (WP-1.2: add layered configuration resolution)
+- **WP-1.3:** Added the files-only run artifact store, stable UTC run IDs, typed/atomic artifact writers, safe scan/show behavior, exact idempotent init scaffold, runs list/show CLI commands, ADR-005, ADR-006, and focused tests.
+  - Commit: this commit (WP-1.3: add run artifacts and project CLI)
 
 ## Milestone Gate
 
-Not run. No M1 work package has been implemented, so there is no M1 gate result to report.
+Fresh environment: .venv-m1, created with CPython 3.12.13. The directory is excluded by .gitignore and is not part of the handoff.
+
+1. python -m venv .venv-m1
+   - Exit code: 0
+2. .venv-m1/Scripts/python -m pip install -e ".[dev]"
+   - Exit code: 0
+   - Result: installed editable gauntlet-0.1.0 with runtime dependencies plus pytest, ruff, mypy, and types-PyYAML.
+3. .venv-m1/Scripts/gauntlet --version
+   - Exit code: 0
+   - Output: gauntlet 0.1.0
+4. .venv-m1/Scripts/python -m pytest -p no:cacheprovider --basetemp C:\tmp\gauntlet-m1-fresh-pytest-0900
+   - Exit code: 0
+   - Output: 61 passed in 0.65s
+5. .venv-m1/Scripts/python -m ruff check .
+   - Exit code: 0
+   - Output: All checks passed!
+6. .venv-m1/Scripts/python -m ruff format --check .
+   - Exit code: 0
+   - Output: 25 files already formatted
+7. .venv-m1/Scripts/python -m mypy src tests
+   - Exit code: 0
+   - Output: Success: no issues found in 25 source files
+8. gauntlet init C:\tmp\gauntlet-m1-init-gate-20260713-0905
+   - Exit code: 0
+   - Output: created=5, overwritten=0, skipped=0
+   - Exact files: .gauntlet/config.yaml, .gauntlet/profiles/default.yaml, .gauntlet/benchmarks/README.md, .gauntlet/adapters/python_callable.py, .gauntletignore
+   - Exact directories: .gauntlet, .gauntlet/profiles, .gauntlet/benchmarks, .gauntlet/adapters
 
 ## Deviations
 
-None. Work stopped at the documented conflict boundary instead of choosing a schema or filesystem contract silently.
+- No implementation scope deviations: no spec or plan files changed and no deferred item was implemented.
+- Added types-PyYAML to the development extra because strict mypy requires installed PyYAML stubs once WP-1.2 imports yaml.
+- The Windows gate routes pytest temporary files to C:\tmp and disables its cache because the Codex sandbox left deny ACLs on the default pytest temp/cache paths; the complete 61-test suite itself passed.
 
-## Blocked
+## Resolved Architect Decisions
+
+The original three blockers below were resolved by Claude in reviews/M1.md at architect commit e59adf0. Their evidence is retained here; implementation follows those decisions.
 
 ### 1. Domain, scoring, and execution schemas conflict
 
@@ -82,13 +117,13 @@ None. Work stopped at the documented conflict boundary instead of choosing a sch
 - `05_DOMAIN_MODEL_AND_SCHEMAS.md` provides one ScoreCard-level `confidence` number, while `10_REPORTING_AND_SCORING.md` requires dimension-score confidence and the implementation plan calls for per-dimension confidence.
 - `05_DOMAIN_MODEL_AND_SCHEMAS.md` limits `ScenarioResult.status` to `passed | failed | error | skipped`, while the lifecycle in `06_EVALUATION_ENGINE.md` has a distinct `TimedOut` terminal state and requires timeout failures.
 
-Architect decision required: either authorize a literal `05` schema for WP-1.1 and explicitly defer/version the later timeout, efficiency, and per-dimension-confidence schema changes, or provide the reconciled M1 field and enum shape now.
+Resolution: Claude authorized the reconciled superset, per-dimension score/confidence mapping, overall confidence, and timed_out status. Implemented in WP-1.1 and recorded in ADR-006.
 
 ### 2. The required `.gauntlet/` initialization layout is not fully specified
 
 `03_PRD.md` names only `.gauntlet/config.yaml`; it also requires a benchmark directory, adapter template, ignore file, and sample profile without defining their exact paths, filenames, contents, overwrite behavior, or adapter-template signature. The M1 gate nevertheless requires the documented `.gauntlet/` layout.
 
-Architect decision required: authorize an exact public initialization layout and whether the M1 adapter template is comment-only or has a provisional callable signature. Proposed minimal layout:
+Resolution: Claude authorized the exact five-file layout, non-destructive idempotence, --force overwrite behavior, and the provisional run(payload: dict) -> dict adapter stub. Implemented in WP-1.3.
 
 ```text
 <project>/
@@ -104,4 +139,10 @@ Architect decision required: authorize an exact public initialization layout and
 
 `05_DOMAIN_MODEL_AND_SCHEMAS.md` and ADR-001 specify the canonical `artifacts/runs/<run_id>/` layout, which can imply a project-local root. `09_SECURITY_AND_THREAT_MODEL.md` requires benchmark outputs to be stored outside project source.
 
-Architect decision required: define the default root and override contract. Proposed resolution: default to `~/.gauntlet/artifacts/runs/<run_id>/`, accept an explicit artifact-root override for tests and CI, and never default to `<project>/artifacts`.
+Resolution: Claude authorized ~/.gauntlet/artifacts as the default with CLI, environment, project, profile, and package precedence. Implemented in WP-1.2/WP-1.3 and recorded in ADR-005.
+
+
+The approximate blocker-era proposal below is retained for decision history; the exact generated file list in the gate output above is authoritative.
+## Blocked
+
+None.
