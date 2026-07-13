@@ -102,14 +102,31 @@ scoring:
 Place project-owned benchmark pack directories in this folder.
 GAUNTLET's benchmark contract is finalized in Milestone 2.
 """
-    adapter = '''"""Project-owned Python callable adapter stub.
+    adapter = '''"""Project-owned Python callable adapter shim.
 
-Milestone 2 finalizes the adapter protocol and integration contract.
+All evaluated tool calls must use the injected registry. Agents with hard-wired
+tools need a thin shim that exposes this boundary.
 """
 
+from typing import Any, Protocol
 
-def run(payload: dict) -> dict:
-    """Receive one evaluation payload and return a JSON-compatible result."""
+
+class ToolRegistry(Protocol):
+    """Minimal interface supplied by the GAUNTLET fixture harness."""
+
+    def call(
+        self,
+        name: str,
+        arguments: dict[str, Any] | None = None,
+    ) -> Any: ...
+
+
+def run(
+    payload: dict[str, Any],
+    *,
+    tools: ToolRegistry,
+) -> dict[str, Any]:
+    """Receive one evaluation payload and use only the injected tools."""
     raise NotImplementedError("Implement the project adapter before evaluation")
 '''
     ignore = """# Files excluded from GAUNTLET project discovery and evidence capture.
