@@ -1,0 +1,14 @@
+id: gauntlet.test.minimal
+version: 0.1.0
+title: Minimal Test Pack
+description: Small valid pack used by loader and CLI tests.
+schema_version: 1
+required_capabilities:
+  - invoke
+  - trace_tool_calls
+dimensions:
+  - correctness
+  - reliability
+scenarios:
+  - scenarios/basic.yaml
+scoring_policy: scoring.yaml

@@ -71,10 +71,11 @@ def test_init_creates_exact_valid_project_layout(tmp_path: Path) -> None:
 
     adapter_source = (project / ".gauntlet/adapters/python_callable.py").read_text(encoding="utf-8")
     ast.parse(adapter_source)
-    assert "def run(payload: dict) -> dict:" in adapter_source
+    assert "def run(" in adapter_source
+    assert "*,\n    tools: ToolRegistry," in adapter_source
     assert "NotImplementedError" in adapter_source
     assert "import gauntlet" not in adapter_source.lower()
-    assert "Milestone 2" in adapter_source
+    assert "hard-wired" in adapter_source
 
 
 def test_init_is_non_destructive_and_force_overwrites(tmp_path: Path) -> None:

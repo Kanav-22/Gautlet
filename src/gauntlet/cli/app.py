@@ -8,6 +8,7 @@ from typing import Annotated, Never
 import typer
 
 from gauntlet import __version__
+from gauntlet.benchmarks import BenchmarkPackError, load_benchmark_pack
 from gauntlet.config.loader import ARTIFACT_ROOT_ENV
 from gauntlet.evidence.store import (
     ArtifactCorruptionError,
@@ -23,6 +24,8 @@ app = typer.Typer(
 
 runs_app = typer.Typer(help="Inspect locally stored evaluation runs.", no_args_is_help=True)
 app.add_typer(runs_app, name="runs")
+benchmark_app = typer.Typer(help="Validate and inspect benchmark packs.", no_args_is_help=True)
+app.add_typer(benchmark_app, name="benchmark")
 
 
 def _version_callback(value: bool) -> None:
@@ -99,14 +102,31 @@ scoring:
 Place project-owned benchmark pack directories in this folder.
 GAUNTLET's benchmark contract is finalized in Milestone 2.
 """
-    adapter = '''"""Project-owned Python callable adapter stub.
+    adapter = '''"""Project-owned Python callable adapter shim.
 
-Milestone 2 finalizes the adapter protocol and integration contract.
+All evaluated tool calls must use the injected registry. Agents with hard-wired
+tools need a thin shim that exposes this boundary.
 """
 
+from typing import Any, Protocol
 
-def run(payload: dict) -> dict:
-    """Receive one evaluation payload and return a JSON-compatible result."""
+
+class ToolRegistry(Protocol):
+    """Minimal interface supplied by the GAUNTLET fixture harness."""
+
+    def call(
+        self,
+        name: str,
+        arguments: dict[str, Any] | None = None,
+    ) -> Any: ...
+
+
+def run(
+    payload: dict[str, Any],
+    *,
+    tools: ToolRegistry,
+) -> dict[str, Any]:
+    """Receive one evaluation payload and use only the injected tools."""
     raise NotImplementedError("Implement the project adapter before evaluation")
 '''
     ignore = """# Files excluded from GAUNTLET project discovery and evidence capture.
@@ -126,6 +146,24 @@ node_modules/
         Path(".gauntlet/adapters/python_callable.py"): adapter,
         Path(".gauntletignore"): ignore,
     }
+
+
+@benchmark_app.command("validate")
+def validate_benchmark(
+    path: Annotated[
+        Path,
+        typer.Argument(help="Benchmark directory or manifest YAML file."),
+    ],
+) -> None:
+    """Validate a benchmark manifest, its scenarios, and pack references."""
+    try:
+        benchmark = load_benchmark_pack(path)
+    except BenchmarkPackError as error:
+        _configuration_error(str(error))
+    typer.echo(
+        f"Valid benchmark {benchmark.identity.id} version {benchmark.identity.version} "
+        f"(schema {benchmark.identity.schema_version}, {len(benchmark.scenarios)} scenarios)"
+    )
 
 
 @app.command("init")
