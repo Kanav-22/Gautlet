@@ -1,0 +1,42 @@
+{
+  "project": "GAUNTLET",
+  "spec_version": "0.1.0",
+  "primary_goal": "Local-first AI evaluation platform focused on agentic systems",
+  "reading_order": [
+    "00_README.md",
+    "01_MASTER_EXECUTION_PROMPT.md",
+    "02_PRODUCT_VISION.md",
+    "03_PRD.md",
+    "04_SYSTEM_ARCHITECTURE.md",
+    "05_DOMAIN_MODEL_AND_SCHEMAS.md",
+    "06_EVALUATION_ENGINE.md",
+    "07_AGENT_EVALUATION_PACK.md",
+    "08_PLUGIN_SDK.md",
+    "09_SECURITY_AND_THREAT_MODEL.md",
+    "10_REPORTING_AND_SCORING.md",
+    "11_CLI_AND_DEVELOPER_EXPERIENCE.md",
+    "12_TESTING_AND_ACCEPTANCE.md",
+    "13_IMPLEMENTATION_ROADMAP.md",
+    "14_ADR_TEMPLATE.md",
+    "15_OPEN_QUESTIONS.md",
+    "spec_manifest.json"
+  ],
+  "constraints": {
+    "budget": "minimal",
+    "hardware": "single laptop",
+    "implementation": "Python-first",
+    "architecture": "modular monolith",
+    "cloud": "optional"
+  },
+  "mvp_deliverables": [
+    "CLI",
+    "Python callable adapter",
+    "Agent benchmark pack",
+    "Subprocess execution",
+    "Evidence store",
+    "Scoring engine",
+    "JSON report",
+    "Markdown report",
+    "Regression comparison"
+  ]
+}
