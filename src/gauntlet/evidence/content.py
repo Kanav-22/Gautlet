@@ -10,7 +10,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from pydantic import JsonValue
 
@@ -22,7 +22,9 @@ from gauntlet.evidence.store import (
     _filesystem_path,
     _json_text,
 )
-from gauntlet.execution import ScenarioExecution
+
+if TYPE_CHECKING:
+    from gauntlet.execution.executor import ScenarioExecution
 
 REDACTION_MARKER = "[REDACTED]"
 _EVIDENCE_SCHEMA_VERSION = 1
