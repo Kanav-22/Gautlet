@@ -53,8 +53,6 @@ Additional CI-ready checks:
 
 None.
 
----
-
 ## Milestone 1 - Config, Schemas, and Run Artifacts
 
 - **Branch:** `codex/m1-core-artifacts`
@@ -146,8 +144,6 @@ The approximate blocker-era proposal below is retained for decision history; the
 ## Blocked
 
 None.
-
----
 
 ## Milestone 2 - Benchmark and Adapter Contracts
 
@@ -255,6 +251,71 @@ Fresh environment: `.tmp/gauntlet-m2-fix-405a698`, created from CPython 3.12.10 
 
 - None. The implementation change is exactly the one-line correction required by `reviews/M2.md`; no unrelated code, test, spec, plan, or review file was changed.
 - The POSIX failure cannot be reproduced by the Windows gate because Windows virtualenv interpreters are regular files. Claude's review documents its independent Linux scratch verification; Claude will re-run Linux against this committed Codex head.
+
+## Blocked
+
+None.
+
+---
+
+## Milestone 3 - Execution Engine and Evidence
+
+- **Branch:** `codex/m3-execution-evidence`
+- **Status:** Ready for Claude review
+- **Authorization:** M3 authorization in `reviews/M2.md`, based on the approved M2 integration commit `ebeabff`
+
+## Work Packages Completed
+
+- **WP-3.1:** Added the scenario lifecycle executor with parent-deadline timeout mapping, deterministic seeded fixture attempts, retryable-child-only retries, unconditional cleanup, normalized `ScenarioResult` output, and input-order-preserving bounded local concurrency.
+  - Commit: `3f5b4d1` (`WP-3.1: add bounded scenario executor`)
+- **WP-3.2:** Added content-addressed evidence envelopes for outputs, traces, fixtures, lifecycle metrics, tool calls, stderr, and exceptions. Literal and regex secrets are redacted in memory before any write; hashes cover the exact redacted persisted bytes; evidence is tamper-checked and linked back to each result.
+  - Commit: `4ad6556` (`WP-3.2: add redacted content-addressed evidence`)
+- **WP-3.3:** Added strict definitions and deterministic evaluation for all nine MVP assertions: `tool_called`, `max_tool_calls`, `output_contains`, `output_field_equals`, `schema_valid`, `no_forbidden_calls`, `max_steps`, `no_hallucinated_success`, and `completed_before_timeout`. Every assertion result carries non-empty, verified evidence references.
+  - Commit: this commit (`WP-3.3: add evidence-linked assertion engine`)
+
+## Milestone Gate
+
+Fresh environment: `.venv-m3-gate`, created from CPython 3.12.10 after all three WP commits. Pytest temporary data used the workspace-owned `.tmp` directory with cache disabled. Both paths are ignored and are not part of the handoff commit.
+
+1. `python -m venv .venv-m3-gate`
+   - Exit code: `0`
+   - Output: `Python 3.12.10`
+2. `.venv-m3-gate/Scripts/python -m pip install -e ".[dev]"`
+   - Exit code: `0`
+   - Result: built editable `gauntlet-0.1.0` and successfully installed every runtime and development dependency, including `jsonschema` and `types-jsonschema`.
+3. `.venv-m3-gate/Scripts/gauntlet --version`
+   - Exit code: `0`
+   - Output: `gauntlet 0.1.0`
+4. `.venv-m3-gate/Scripts/python -m pytest -p no:cacheprovider --basetemp .tmp/m3-gate-pytest`
+   - Exit code: `0`
+   - Output: `163 passed in 8.71s` on Windows, Python 3.12.10, pytest 9.1.1.
+5. `.venv-m3-gate/Scripts/ruff check .`
+   - Exit code: `0`
+   - Output: `All checks passed!`
+6. `.venv-m3-gate/Scripts/ruff format --check .`
+   - Exit code: `0`
+   - Output: `55 files already formatted`
+7. `.venv-m3-gate/Scripts/mypy src tests`
+   - Exit code: `0`
+   - Output: `Success: no issues found in 42 source files`
+8. Explicit M3 security gate (five named tests: persisted-evidence secret scan, real hanging-child timeout/reap, network/secret environment exclusion, malicious-stdout containment, and evidence refs on all nine assertion results):
+   - Exit code: `0`
+   - Output: `5 passed in 1.42s`
+9. Named adapter integration: `pytest tests/test_sample_agent.py::test_sample_agent_real_subprocess_captures_full_dependent_trace`
+   - Exit code: `0`
+   - Output: `1 passed in 0.46s`
+10. Benchmark validation CLI:
+    - Valid fixture: exit `0`; output `Valid benchmark gauntlet.test.minimal version 0.1.0 (schema 1, 1 scenarios)`.
+    - Invalid fixture: explicit PowerShell `$LASTEXITCODE` capture returned `2`; actionable output identified the missing manifest `title` field with no traceback.
+
+## Deviations
+
+- No scope deviation: specs `00`-`16`, `reviews/`, `adapters/`, and all deferred features remain untouched.
+- Added runtime `jsonschema` and development `types-jsonschema` dependencies so `schema_valid` implements JSON Schema Draft 2020-12 rather than an incomplete custom subset. Non-local `$ref` values are rejected to preserve offline evaluation.
+- The specs do not define retry-policy keys. The executor accepts `execution_policy.max_retries` (default `0`) and retries only `AdapterChildError` values already marked `retryable`, always with a fresh child and rewound fixtures.
+- The authorized network gate is implemented as network-policy environment isolation: proxy settings, API keys, and secrets are excluded from the child. Consistent with ADR-002, subprocess isolation is not presented as OS-level socket denial.
+- `no_hallucinated_success` uses deterministic fixture-consumption proof: an output claiming `completed: true` must be backed by all declared `tool_sequence` fixtures consumed in order. This avoids framework-specific field-name heuristics.
+- Content-addressed filenames exposed a Windows legacy path-length boundary in deeply nested pytest paths. Artifact I/O now uses Windows extended-length paths internally while retaining portable relative evidence paths; short retries handle transient Windows file-handle contention.
 
 ## Blocked
 

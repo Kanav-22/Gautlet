@@ -6,6 +6,7 @@ import json
 import os
 import re
 import secrets
+import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -96,18 +97,46 @@ def _json_text(payload: object) -> str:
     )
 
 
+def _filesystem_path(path: Path) -> Path:
+    """Use an extended-length absolute path for Windows filesystem calls."""
+
+    if os.name != "nt":
+        return path
+    value = str(path.resolve())
+    if value.startswith("\\\\?\\"):
+        return Path(value)
+    if value.startswith("\\\\"):
+        return Path("\\\\?\\UNC\\" + value[2:])
+    return Path("\\\\?\\" + value)
+
+
 def _atomic_write_text(path: Path, content: str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.{secrets.token_hex(8)}.tmp")
+    destination = _filesystem_path(path)
+    temporary = destination.with_name(f".{path.name}.{secrets.token_hex(8)}.tmp")
 
     try:
         with temporary.open("x", encoding="utf-8", newline="\n") as handle:
             handle.write(content)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temporary, path)
+        for attempt in range(5):
+            try:
+                os.replace(temporary, destination)
+                break
+            except PermissionError:
+                if os.name != "nt" or attempt == 4:
+                    raise
+                time.sleep(0.01 * (attempt + 1))
     finally:
-        temporary.unlink(missing_ok=True)
+        for attempt in range(5):
+            try:
+                temporary.unlink(missing_ok=True)
+                break
+            except PermissionError:
+                if os.name != "nt" or attempt == 4:
+                    raise
+                time.sleep(0.01 * (attempt + 1))
 
     return path
 
