@@ -320,3 +320,81 @@ Fresh environment: `.venv-m3-gate`, created from CPython 3.12.10 after all three
 ## Blocked
 
 None.
+
+---
+
+## Milestone 4 - Metrics, Scoring, Reports, and Comparison
+
+- **Branch:** `codex/m4-scoring-reports`
+- **Status:** Ready for Claude review
+- **Authorization:** M4 authorization in `reviews/M3.md`, based on the approved M3 integration commit `3cde977`
+
+## Work Packages Completed
+
+- **WP-4.1:** Added evidence-linked scenario metric collection for task success, latency, steps, tool calls, retries, recovery steps, exceptions, and exact adapter-reported usage. Missing token or cost counters remain absent rather than being estimated.
+  - Commit: `87482b5` (`WP-4.1: add evidence-linked metric collectors`)
+- **WP-4.2:** Added the policy-driven scoring engine and `agent_mvp_default` policy with weighted dimensions, confidence, policy caps and minimums, release recommendations, and citations for every applied rule.
+  - Commit: `22d8db7` (`WP-4.2: add policy-driven scoring engine`)
+- **WP-4.3:** Added the evaluation-to-report pipeline and atomic, redacted publication of `results.json`, `scorecard.json`, `findings.json`, normalized configuration, and `report.md`, with the completed manifest published only after every required artifact succeeds.
+  - Commit: `cf24c10` (`WP-4.3: add scored report pipeline`)
+- **WP-4.4:** Added strict run comparison plus `gauntlet compare`, with explicit comparability context, score/failure/latency/cost deltas, deterministic regression assessment, and documented exit behavior for regressions, invalid input, incomplete runs, and insufficient live-service evidence.
+  - Commit: this commit (`WP-4.4: add context-aware run comparison`)
+
+## Milestone Gate
+
+Fresh environment: `.venv-m4-gate`, created from CPython 3.12.10 after the four work packages were implemented. Successful pytest runs used unique workspace-owned `.tmp` directories with cache disabled. Both paths are ignored and are not part of the handoff commit.
+
+1. `python -m venv .venv-m4-gate`
+   - Exit code: `0`
+   - Output: `Python 3.12.10`
+2. `.venv-m4-gate/Scripts/python -m pip install -e ".[dev]"`
+   - Exit code: `0`
+   - Result: built editable `gauntlet-0.1.0` and successfully installed all runtime and development dependencies.
+3. `.venv-m4-gate/Scripts/gauntlet --version`
+   - Exit code: `0`
+   - Output: `gauntlet 0.1.0`
+4. `.venv-m4-gate/Scripts/python -m pytest -p no:cacheprovider --basetemp .tmp/gauntlet-m4-gate-20260715-2`
+   - Exit code: `0`
+   - Output: `203 passed in 21.21s` on Windows, Python 3.12.10, pytest 9.1.1.
+   - Environment note: the first unchanged attempt with `--basetemp C:\tmp\gauntlet-m4-gate-20260715-1` exited `1` after `137 passed, 66 errors in 10.34s`; every error was a pytest `tmp_path` setup `PermissionError` because the Windows sandbox denied creation of that base directory. Rerouting only pytest temporary data to the ignored workspace path produced the complete green result above.
+5. `.venv-m4-gate/Scripts/ruff check .`
+   - Exit code: `0`
+   - Output: `All checks passed!`
+6. `.venv-m4-gate/Scripts/ruff format --check .`
+   - Exit code: `0`
+   - Output: `64 files already formatted`
+7. `.venv-m4-gate/Scripts/mypy src tests`
+   - Exit code: `0`
+   - Output: `Success: no issues found in 53 source files`
+8. Named adapter integration: `pytest tests/test_sample_agent.py::test_sample_agent_real_subprocess_captures_full_dependent_trace`
+   - Exit code: `0`
+   - Output: `1 passed in 0.63s`
+9. Explicit inherited security gate (persisted-evidence secret scan, real hanging-child timeout/reap, network-credential environment exclusion, malicious-stdout containment, and evidence refs on all nine assertion results):
+   - Exit code: `0`
+   - Output: `5 passed in 1.58s`
+10. Explicit M4 acceptance gate (correct golden agent outscores the degraded variant, hand-computed policy score, deterministic regression detection, and configuration-change distinction):
+    - Exit code: `0`
+    - Output: `4 passed in 9.89s`
+11. Focused whole-run redaction and public comparison CLI checks:
+    - Exit code: `0`
+    - Output: `2 passed in 1.34s`
+12. Benchmark validation CLI:
+    - Valid fixture: exit `0`; output `Valid benchmark gauntlet.test.minimal version 0.1.0 (schema 1, 1 scenarios)`.
+    - Invalid fixture: explicit PowerShell `$LASTEXITCODE` capture returned `2`; actionable output identified the missing manifest `title` field with no traceback.
+
+## Deviations
+
+- No unauthorized scope change: specs `00`-`16`, `reviews/`, `adapters/`, `execution/`, and all deferred features remain untouched.
+- The specification supplies policy weights, caps, and minimums but not metric normalization curves or recommendation score bands. The policy therefore records deterministic conservative formulas plus `ready_score: 80` and `passing_score: 60` instead of hiding those choices in code.
+- Reproducibility is never inferred from one successful run. It requires explicit repeat-comparison evidence; missing repeat evidence lowers confidence and can make the evaluation inconclusive, preserving ADR-004.
+- Regression significance thresholds are unspecified. Deterministic fixture comparisons use exact new-failure or score-decrease evidence; live-service runs return insufficient data, while latency and cost remain visible raw deltas and do not trigger invented regressions.
+- Compare-specific exit codes were not specified. `gauntlet compare` uses `1` for a proven regression, `0` for no regression or a documented context change, `2` for invalid input, and `5` for corrupt/incomplete artifacts or insufficient live-service evidence.
+- Benchmark provenance and the configuration fingerprint are persisted in the report summary because the existing `EvaluationRun` model has no comparison-critical version fields.
+- Token and cost metrics are published only when every contributing adapter attempt supplies valid canonical counters. Missing usage remains absent, never zero-filled or estimated.
+- WP-4.3 extends the evidence store with exact usage evidence and atomic Markdown persistence so metrics stay traceable and `report.md` follows the same publish-safely discipline as JSON/YAML artifacts.
+- M4 provides the authorized library-level evaluation pipeline. The complete `gauntlet evaluate` CLI workflow remains in M5.
+- `.tmp/` is ignored solely to provide Windows-sandbox-safe pytest paths; it does not change runtime artifact placement.
+
+## Blocked
+
+None.

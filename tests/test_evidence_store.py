@@ -278,6 +278,7 @@ def test_execution_evidence_is_linked_and_all_persisted_secrets_are_redacted(
         "trace",
         "fixtures",
         "execution",
+        "usage",
         "stderr",
         "exception",
         "tool_call",

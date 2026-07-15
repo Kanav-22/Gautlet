@@ -335,6 +335,16 @@ class EvidenceStore:
                 **common,
                 "attempt": attempt.attempt_number,
             }
+            if attempt.usage:
+                add(
+                    "usage",
+                    self.persist(
+                        run_id,
+                        EvidenceType.METRIC,
+                        cast(JsonValue, copy.deepcopy(attempt.usage)),
+                        metadata={**attempt_metadata, "kind": "adapter_usage"},
+                    ),
+                )
             if attempt.stderr:
                 add(
                     "stderr",

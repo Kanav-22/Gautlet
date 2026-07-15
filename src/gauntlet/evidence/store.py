@@ -394,3 +394,12 @@ class RunArtifactStore:
             "findings.json",
             [finding.model_dump(mode="json") for finding in findings],
         )
+
+    def write_report(self, run_id: str, markdown: str) -> Path:
+        """Atomically write the fixed human-readable report artifact."""
+
+        self.load_manifest(run_id)
+        if "\x00" in markdown:
+            raise ArtifactStoreError("Markdown report must not contain null bytes")
+        content = markdown if markdown.endswith("\n") else markdown + "\n"
+        return _atomic_write_text(self.run_dir(run_id) / "report.md", content)
