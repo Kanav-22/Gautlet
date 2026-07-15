@@ -16,6 +16,13 @@ from gauntlet.evidence.store import (
     RunArtifactStore,
     RunNotFoundError,
 )
+from gauntlet.reporting import (
+    ComparisonArtifactError,
+    ComparisonInputError,
+    RegressionAssessment,
+    RunComparisonService,
+    format_run_comparison,
+)
 
 app = typer.Typer(
     help="Evaluate agentic AI systems with reproducible evidence.",
@@ -257,3 +264,30 @@ def show_run(
     except ArtifactCorruptionError as error:
         _incomplete_error(str(error))
     typer.echo(json.dumps(run.model_dump(mode="json"), indent=2, sort_keys=True))
+
+
+@app.command("compare")
+def compare_runs(
+    run_a: Annotated[str, typer.Argument(help="Baseline GAUNTLET run ID.")],
+    run_b: Annotated[str, typer.Argument(help="Candidate GAUNTLET run ID.")],
+    artifact_root: Annotated[
+        Path | None,
+        typer.Option(
+            "--artifact-root",
+            help="Artifact root containing both run directories.",
+        ),
+    ] = None,
+) -> None:
+    """Compare RUN_B against RUN_A with context-aware regression rules."""
+
+    try:
+        comparison = RunComparisonService(_artifact_store(artifact_root)).compare(run_a, run_b)
+    except (InvalidRunIdError, RunNotFoundError, ComparisonInputError) as error:
+        _configuration_error(str(error))
+    except (ArtifactCorruptionError, ComparisonArtifactError) as error:
+        _incomplete_error(str(error))
+    typer.echo(format_run_comparison(comparison))
+    if comparison.assessment is RegressionAssessment.REGRESSION:
+        raise typer.Exit(code=1)
+    if comparison.assessment is RegressionAssessment.INSUFFICIENT_DATA:
+        raise typer.Exit(code=5)
