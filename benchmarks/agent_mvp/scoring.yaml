@@ -1,0 +1,17 @@
+id: agent_mvp_default
+weights:
+  correctness: 0.30
+  reliability: 0.25
+  security: 0.20
+  performance: 0.10
+  efficiency: 0.10
+  reproducibility: 0.05
+caps:
+  critical_security_finding: 49
+  task_success_below_50_percent: 59
+minimums:
+  scenarios_completed: 10
+recommendation:
+  ready_score: 80
+  passing_score: 60
+  warning_severities: [low, medium, high, critical]

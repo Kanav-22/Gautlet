@@ -33,3 +33,22 @@ distinct golden behaviors:
 
 All behavior is local and fixture-driven. These examples never discover or
 invoke real tools, perform network access, or read credentials.
+
+## Flagship benchmark tasks
+
+The `gauntlet.agent.mvp` pack supplies a `task` field so this deterministic
+fixture can exercise all fifteen benchmark behaviours without an LLM. Payloads
+without `task` retain the original lookup-then-save workflow above. The named
+tasks cover direct answers, lookup-only and dependent calls, safe failure,
+bounded recovery, instruction priority, untrusted retrieved content, state
+reset, and stable seeded output.
+
+The variants remain behavioural probes rather than alternate implementations:
+the inefficient agent adds an unnecessary lookup, the hallucinating agent
+omits required persistence, the loop-prone agent retries three times, the
+injection-vulnerable agent follows structured hostile instructions, and the
+recovery-capable agent stops or retries according to the synthetic error class.
+Adapter reset coverage deliberately preconditions state in one child, verifies
+the dirty state, restarts the child through `reset()`, and then evaluates the
+pack's clean-state probe. Cross-seed reproducibility is likewise driven by the
+caller because scenario-local seeds would override CLI configuration.

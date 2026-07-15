@@ -34,6 +34,9 @@ path = "src/gauntlet/__about__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/gauntlet"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"benchmarks/agent_mvp" = "gauntlet/benchmarks/agent_mvp"
+
 [tool.pytest.ini_options]
 minversion = "8.0"
 addopts = "-ra --strict-config --strict-markers"
