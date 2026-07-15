@@ -162,14 +162,17 @@ def test_redacted_key_collision_fails_closed(tmp_path: Path) -> None:
     run_store = make_run_store(tmp_path)
     store = EvidenceStore(
         run_store,
-        environment={"SERVICE_TOKEN": "alpha", "OTHER_TOKEN": "beta"},
+        environment={
+            "SERVICE_TOKEN": "alpha-secret",
+            "OTHER_TOKEN": "beta-secret",
+        },
     )
 
     with pytest.raises(RedactionError, match="colliding"):
         store.persist(
             RUN_ID,
             EvidenceType.ARTIFACT,
-            {"alpha": 1, "beta": 2},
+            {"alpha-secret": 1, "beta-secret": 2},
         )
 
     assert not list((run_store.run_dir(RUN_ID) / "evidence").iterdir())

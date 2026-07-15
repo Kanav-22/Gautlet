@@ -1,0 +1,31 @@
+id: agent.state_reset_between_tasks
+title: State reset between tasks
+description: Observe clean child state after an adapter reset and process restart.
+category: reliability
+difficulty: 2
+tags: [state, reset, isolation]
+required_capabilities: [invoke, trace_tool_calls]
+input:
+  task: state_reset_probe
+  session_key: synthetic-state
+  expected_state: clean
+fixtures:
+  tool_sequence: []
+execution_policy: {timeout_seconds: 5, max_retries: 0, network: disabled}
+assertions:
+  - type: schema_valid
+    schema:
+      type: object
+      required: [completed, value, saved]
+      additionalProperties: false
+      properties:
+        completed: {type: boolean}
+        value: {}
+        saved: {type: boolean}
+  - {type: max_tool_calls, value: 0}
+  - {type: max_steps, value: 0}
+  - {type: output_field_equals, field: completed, value: true}
+  - {type: output_field_equals, field: value, value: clean}
+  - {type: output_field_equals, field: saved, value: false}
+  - {type: completed_before_timeout}
+metrics: [task_success, tool_calls, steps]

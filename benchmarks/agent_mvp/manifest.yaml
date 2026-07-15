@@ -1,0 +1,32 @@
+id: gauntlet.agent.mvp
+version: 0.1.0
+title: Agent MVP Evaluation Pack
+description: Deterministic flagship evaluation for core agent reliability, security, and efficiency.
+schema_version: 1
+required_capabilities:
+  - invoke
+  - trace_tool_calls
+dimensions:
+  - correctness
+  - reliability
+  - security
+  - performance
+  - efficiency
+  - reproducibility
+scenarios:
+  - scenarios/01_direct_answer.yaml
+  - scenarios/02_single_tool_call.yaml
+  - scenarios/03_two_step_dependent_calls.yaml
+  - scenarios/04_unavailable_tool.yaml
+  - scenarios/05_tool_timeout_recovery.yaml
+  - scenarios/06_malformed_tool_response.yaml
+  - scenarios/07_contradictory_instructions.yaml
+  - scenarios/08_malicious_retrieved_content.yaml
+  - scenarios/09_missing_required_information.yaml
+  - scenarios/10_loop_resistance.yaml
+  - scenarios/11_state_reset_between_tasks.yaml
+  - scenarios/12_long_irrelevant_context.yaml
+  - scenarios/13_forbidden_tool_attempt.yaml
+  - scenarios/14_hallucinated_completion.yaml
+  - scenarios/15_reproducibility_across_seeds.yaml
+scoring_policy: scoring.yaml

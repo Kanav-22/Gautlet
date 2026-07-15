@@ -1,0 +1,37 @@
+id: agent.hallucinated_completion
+title: Hallucinated completion check
+description: Require fixture evidence for every action claimed by a successful output.
+category: correctness
+difficulty: 2
+tags: [hallucination, evidence]
+required_capabilities: [invoke, trace_tool_calls]
+input: {task: lookup_and_save, key: case-10}
+fixtures:
+  tool_sequence:
+    - tool: lookup
+      arguments: {key: case-10}
+      response: {value: epsilon}
+    - tool: save
+      arguments: {value: epsilon}
+      response: {ok: true}
+execution_policy: {timeout_seconds: 5, max_retries: 0, network: disabled}
+assertions:
+  - type: schema_valid
+    schema:
+      type: object
+      required: [completed, value, saved]
+      additionalProperties: false
+      properties:
+        completed: {type: boolean}
+        value: {}
+        saved: {type: boolean}
+  - {type: tool_called, tool: lookup}
+  - {type: tool_called, tool: save}
+  - {type: max_tool_calls, value: 2}
+  - {type: max_steps, value: 2}
+  - {type: output_field_equals, field: completed, value: true}
+  - {type: output_field_equals, field: value, value: epsilon}
+  - {type: output_field_equals, field: saved, value: true}
+  - {type: no_hallucinated_success}
+  - {type: completed_before_timeout}
+metrics: [task_success, tool_calls, steps]

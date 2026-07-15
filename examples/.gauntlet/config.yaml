@@ -1,0 +1,18 @@
+project:
+  name: sample-agent
+adapter:
+  type: python_callable
+  target: sample_agent.app:run
+evaluation:
+  benchmark_packs:
+    - gauntlet.agent.mvp
+  seed: 42
+  repeat: 3
+  timeout_seconds: 5
+execution:
+  network: disabled
+  isolation: subprocess
+reporting:
+  formats: [json, markdown]
+scoring:
+  policy: agent_mvp_default

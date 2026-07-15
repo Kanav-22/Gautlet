@@ -9,16 +9,25 @@ import typer
 
 from gauntlet import __version__
 from gauntlet.benchmarks import BenchmarkPackError, load_benchmark_pack
-from gauntlet.config.loader import ARTIFACT_ROOT_ENV
+from gauntlet.config.loader import ARTIFACT_ROOT_ENV, ConfigLoadError
+from gauntlet.discovery import (
+    DoctorStatus,
+    InspectionInputError,
+    InspectionLevel,
+    inspect_project,
+    run_doctor,
+)
 from gauntlet.evidence.store import (
     ArtifactCorruptionError,
     InvalidRunIdError,
     RunArtifactStore,
     RunNotFoundError,
 )
+from gauntlet.orchestration import ProjectEvaluationError, evaluate_project
 from gauntlet.reporting import (
     ComparisonArtifactError,
     ComparisonInputError,
+    EvaluationPipelineError,
     RegressionAssessment,
     RunComparisonService,
     format_run_comparison,
@@ -171,6 +180,170 @@ def validate_benchmark(
         f"Valid benchmark {benchmark.identity.id} version {benchmark.identity.version} "
         f"(schema {benchmark.identity.schema_version}, {len(benchmark.scenarios)} scenarios)"
     )
+
+
+@app.command("inspect")
+def inspect_path(
+    path: Annotated[
+        Path,
+        typer.Argument(help="Python project, package, module, or source file to inspect."),
+    ] = Path("."),
+) -> None:
+    """Inspect Python source statically without importing or executing user code."""
+
+    try:
+        result = inspect_project(path)
+    except InspectionInputError as error:
+        _configuration_error(str(error))
+
+    typer.echo(f"Project: {result.root}")
+    typer.echo(f"Project kind: {result.project_kind.value}")
+    typer.echo(f"Supported adapter: {result.recommended_adapter}")
+    typer.echo(f"Configured target: {result.configured_target or 'not configured'}")
+    typer.echo(f"Recommended target: {result.recommended_target or 'not found'}")
+    frameworks = ", ".join(result.framework_hints) or "none detected"
+    typer.echo(f"Framework hints: {frameworks}")
+    typer.echo("Available plugins: built-in MVP components only")
+    typer.echo("Estimated evaluation cost: not reported until the adapter supplies usage")
+    if result.callables:
+        typer.echo("Callable candidates:")
+        for candidate in result.callables:
+            compatibility = (
+                "compatible"
+                if candidate.accepts_payload
+                and candidate.accepts_tools
+                and not candidate.async_callable
+                else "needs a synchronous adapter shim"
+            )
+            typer.echo(f"  - {candidate.target} ({compatibility})")
+    if result.findings:
+        typer.echo("Findings:")
+        for finding in result.findings:
+            location = ""
+            if finding.path is not None:
+                location = f" [{finding.path}"
+                if finding.line is not None:
+                    location += f":{finding.line}"
+                location += "]"
+            typer.echo(
+                f"  - {finding.level.value.upper()} {finding.code}: {finding.message}{location}"
+            )
+            if finding.action is not None:
+                typer.echo(f"    Action: {finding.action}")
+    if any(finding.level is InspectionLevel.ERROR for finding in result.findings):
+        raise typer.Exit(code=2)
+
+
+@app.command("doctor")
+def doctor(
+    artifact_root: Annotated[
+        Path | None,
+        typer.Option(
+            "--artifact-root",
+            help="Artifact root to verify; defaults to GAUNTLET_ARTIFACT_ROOT or the package default.",
+        ),
+    ] = None,
+) -> None:
+    """Run deterministic offline installation and environment checks."""
+
+    selected_root = artifact_root
+    if selected_root is None and ARTIFACT_ROOT_ENV in os.environ:
+        selected_root = Path(os.environ[ARTIFACT_ROOT_ENV])
+    result = run_doctor(artifact_root=selected_root)
+    for check in result.checks:
+        typer.echo(f"[{check.status.value}] {check.id}: {check.message}")
+        if check.action is not None:
+            typer.echo(f"  Action: {check.action}")
+    if not result.ok:
+        failed = sum(check.status is DoctorStatus.FAIL for check in result.checks)
+        typer.echo(f"Doctor failed: {failed} required check(s) need attention.", err=True)
+        raise typer.Exit(code=2)
+    typer.echo("Doctor passed: all required offline checks succeeded.")
+
+
+@app.command("evaluate")
+def evaluate(
+    path: Annotated[
+        Path,
+        typer.Argument(help="Initialized GAUNTLET project directory."),
+    ] = Path("."),
+    profile: Annotated[
+        str | None,
+        typer.Option("--profile", help="Project-local profile name."),
+    ] = None,
+    benchmark: Annotated[
+        str | None,
+        typer.Option("--benchmark", help="Benchmark ID or local pack path."),
+    ] = None,
+    scenario: Annotated[
+        str | None,
+        typer.Option("--scenario", help="Run one exact scenario ID."),
+    ] = None,
+    seed: Annotated[
+        int | None,
+        typer.Option("--seed", help="Deterministic fixture seed."),
+    ] = None,
+    repeat: Annotated[
+        int | None,
+        typer.Option("--repeat", min=1, help="Number of complete benchmark repeats."),
+    ] = None,
+    offline: Annotated[
+        bool,
+        typer.Option("--offline", help="Force network-disabled execution."),
+    ] = False,
+    artifact_root: Annotated[
+        Path | None,
+        typer.Option("--artifact-root", help="Override the local run artifact root."),
+    ] = None,
+    quiet: Annotated[
+        bool,
+        typer.Option("--quiet", help="Print only the final report path or an error."),
+    ] = False,
+    verbose: Annotated[
+        bool,
+        typer.Option("--verbose", help="Print run identity and scoring details."),
+    ] = False,
+) -> None:
+    """Evaluate a configured Python callable and publish evidence-backed reports."""
+
+    if quiet and verbose:
+        _configuration_error("--quiet and --verbose are mutually exclusive")
+    if not quiet:
+        typer.echo(f"Evaluating project {path}...")
+    try:
+        result = evaluate_project(
+            path,
+            profile=profile,
+            benchmark=benchmark,
+            scenario=scenario,
+            seed=seed,
+            repeat=repeat,
+            offline=offline,
+            artifact_root=artifact_root,
+        )
+    except (ProjectEvaluationError, ConfigLoadError, BenchmarkPackError) as error:
+        _configuration_error(str(error))
+    except EvaluationPipelineError as error:
+        typer.echo(f"Error: {error}", err=True)
+        raise typer.Exit(code=int(error.exit_code)) from error
+
+    if verbose:
+        typer.echo(f"Run: {result.run.id}")
+        typer.echo(f"Recommendation: {result.scoring.recommendation.value}")
+        typer.echo(f"Overall score: {result.scoring.scorecard.overall:.2f}/100")
+        typer.echo(
+            "Reproducibility: "
+            f"{result.reproducibility.claim.value} "
+            f"({result.reproducibility.repeat_count} repeat(s))"
+        )
+    elif not quiet:
+        typer.echo(
+            f"Completed {result.run.id}: {result.scoring.recommendation.value}, "
+            f"score {result.scoring.scorecard.overall:.2f}/100"
+        )
+    typer.echo(f"Report: {result.artifacts.markdown}")
+    if result.exit_code.value != 0:
+        raise typer.Exit(code=int(result.exit_code))
 
 
 @app.command("init")

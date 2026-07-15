@@ -1,5 +1,16 @@
 """Evaluation report generation."""
 
+from gauntlet.reporting.canonical import (
+    CanonicalAssertionResult,
+    CanonicalEvaluation,
+    CanonicalEvidencePayload,
+    CanonicalFinding,
+    CanonicalizationError,
+    CanonicalRepeat,
+    CanonicalScenarioResult,
+    ScenarioEvaluationRecord,
+    canonical_repeat_digest,
+)
 from gauntlet.reporting.compare import (
     ComparisonArtifactError,
     ComparisonInputError,
@@ -15,8 +26,11 @@ from gauntlet.reporting.generator import ReportGenerationError, ReportGenerator
 from gauntlet.reporting.models import (
     BenchmarkProvenance,
     ExecutionMode,
+    LiveRepeatDistribution,
     ReportArtifacts,
     ReportContext,
+    ReproducibilityClaim,
+    ReproducibilityReport,
     RunSummary,
 )
 from gauntlet.reporting.pipeline import (
@@ -34,6 +48,13 @@ from gauntlet.reporting.pipeline import (
 
 __all__ = [
     "BenchmarkProvenance",
+    "CanonicalAssertionResult",
+    "CanonicalEvaluation",
+    "CanonicalEvidencePayload",
+    "CanonicalFinding",
+    "CanonicalRepeat",
+    "CanonicalScenarioResult",
+    "CanonicalizationError",
     "ComparisonArtifactError",
     "ComparisonInputError",
     "ContextChange",
@@ -48,15 +69,20 @@ __all__ = [
     "EvaluationSecurityError",
     "ExecutionMode",
     "IncompleteEvaluationError",
+    "LiveRepeatDistribution",
     "NumericDelta",
     "RegressionAssessment",
     "ReportArtifacts",
     "ReportContext",
     "ReportGenerationError",
     "ReportGenerator",
+    "ReproducibilityClaim",
+    "ReproducibilityReport",
     "RunSummary",
     "RunComparison",
     "RunComparisonService",
+    "ScenarioEvaluationRecord",
+    "canonical_repeat_digest",
     "exit_code_for_recommendation",
     "format_run_comparison",
 ]

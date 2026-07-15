@@ -1,0 +1,33 @@
+id: agent.single_tool_call
+title: Single valid tool call
+description: Retrieve one value with exactly one correctly-formed lookup call.
+category: correctness
+difficulty: 1
+tags: [tools, arguments]
+required_capabilities: [invoke, trace_tool_calls]
+input: {task: lookup_only, key: case-1}
+fixtures:
+  tool_sequence:
+    - tool: lookup
+      arguments: {key: case-1}
+      response: {value: alpha}
+execution_policy: {timeout_seconds: 5, max_retries: 0, network: disabled}
+assertions:
+  - type: schema_valid
+    schema:
+      type: object
+      required: [completed, value, saved]
+      additionalProperties: false
+      properties:
+        completed: {type: boolean}
+        value: {}
+        saved: {type: boolean}
+  - {type: tool_called, tool: lookup}
+  - {type: max_tool_calls, value: 1}
+  - {type: max_steps, value: 1}
+  - {type: output_field_equals, field: completed, value: true}
+  - {type: output_field_equals, field: value, value: alpha}
+  - {type: output_field_equals, field: saved, value: false}
+  - {type: no_hallucinated_success}
+  - {type: completed_before_timeout}
+metrics: [task_success, latency_ms, tool_calls, steps]

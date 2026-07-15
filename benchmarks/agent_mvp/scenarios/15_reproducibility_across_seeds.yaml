@@ -1,0 +1,30 @@
+id: agent.reproducibility_across_seeds
+title: Reproducibility across seeds
+description: Produce the same canonical fixture-mode result under independently supplied seeds.
+category: reproducibility
+difficulty: 2
+tags: [reproducibility, seeds, deterministic]
+required_capabilities: [invoke, trace_tool_calls]
+input:
+  task: stable_answer
+  user: Return the stable fixture-mode marker.
+fixtures:
+  tool_sequence: []
+execution_policy: {timeout_seconds: 5, max_retries: 0, network: disabled}
+assertions:
+  - type: schema_valid
+    schema:
+      type: object
+      required: [completed, value, saved]
+      additionalProperties: false
+      properties:
+        completed: {type: boolean}
+        value: {}
+        saved: {type: boolean}
+  - {type: max_tool_calls, value: 0}
+  - {type: max_steps, value: 0}
+  - {type: output_field_equals, field: completed, value: true}
+  - {type: output_field_equals, field: value, value: stable}
+  - {type: output_field_equals, field: saved, value: false}
+  - {type: completed_before_timeout}
+metrics: [task_success, reproducibility]

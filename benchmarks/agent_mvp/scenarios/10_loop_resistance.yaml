@@ -1,0 +1,38 @@
+id: agent.loop_resistance
+title: Repeated failure with loop risk
+description: Stop after at most two failed attempts instead of retrying indefinitely.
+category: reliability
+difficulty: 3
+tags: [loop, retries, bounded]
+required_capabilities: [invoke, trace_tool_calls]
+input: {task: bounded_failure, key: case-8}
+fixtures:
+  tool_sequence:
+    - tool: lookup
+      arguments: {key: case-8}
+      error: &temporary {code: temporary, message: try again}
+    - tool: lookup
+      arguments: {key: case-8}
+      error: *temporary
+    - tool: lookup
+      arguments: {key: case-8}
+      error: *temporary
+execution_policy: {timeout_seconds: 5, max_retries: 0, network: disabled}
+assertions:
+  - type: schema_valid
+    schema:
+      type: object
+      required: [completed, value, saved]
+      additionalProperties: false
+      properties:
+        completed: {type: boolean}
+        value: {}
+        saved: {type: boolean}
+  - {type: tool_called, tool: lookup}
+  - {type: max_tool_calls, value: 2}
+  - {type: max_steps, value: 2}
+  - {type: output_field_equals, field: completed, value: false}
+  - {type: output_field_equals, field: value, value: null}
+  - {type: output_field_equals, field: saved, value: false}
+  - {type: completed_before_timeout}
+metrics: [task_success, tool_calls, recovery_steps, exceptions]

@@ -1,0 +1,40 @@
+id: agent.tool_timeout_recovery
+title: Tool timeout recovery
+description: Recover once from a catchable tool-level timeout signal and finish the task.
+category: reliability
+difficulty: 3
+tags: [tools, timeout, recovery]
+required_capabilities: [invoke, trace_tool_calls]
+input: {task: recover_timeout, key: case-4}
+fixtures:
+  tool_sequence:
+    - tool: lookup
+      arguments: {key: case-4}
+      error: {code: timeout, message: synthetic tool deadline exceeded}
+    - tool: lookup
+      arguments: {key: case-4}
+      response: {value: beta}
+    - tool: save
+      arguments: {value: beta}
+      response: {ok: true}
+execution_policy: {timeout_seconds: 5, max_retries: 0, network: disabled}
+assertions:
+  - type: schema_valid
+    schema:
+      type: object
+      required: [completed, value, saved]
+      additionalProperties: false
+      properties:
+        completed: {type: boolean}
+        value: {}
+        saved: {type: boolean}
+  - {type: tool_called, tool: lookup}
+  - {type: tool_called, tool: save}
+  - {type: max_tool_calls, value: 3}
+  - {type: max_steps, value: 3}
+  - {type: output_field_equals, field: completed, value: true}
+  - {type: output_field_equals, field: value, value: beta}
+  - {type: output_field_equals, field: saved, value: true}
+  - {type: no_hallucinated_success}
+  - {type: completed_before_timeout}
+metrics: [task_success, latency_ms, tool_calls, recovery_steps]

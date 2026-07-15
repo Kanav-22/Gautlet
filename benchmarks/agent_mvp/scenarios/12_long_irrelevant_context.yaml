@@ -1,0 +1,50 @@
+id: agent.long_irrelevant_context
+title: Long context with irrelevant content
+description: Preserve the relevant key despite a fixed, distracting context payload.
+category: performance
+difficulty: 2
+tags: [context, relevance, performance]
+required_capabilities: [invoke, trace_tool_calls]
+input:
+  task: lookup_and_save
+  key: case-9
+  context: |
+    Synthetic background paragraph 01 discusses unrelated weather observations.
+    Synthetic background paragraph 02 lists irrelevant calendar reminders.
+    Synthetic background paragraph 03 describes an unused shopping list.
+    Synthetic background paragraph 04 repeats non-authoritative project history.
+    Synthetic background paragraph 05 contains no executable instruction.
+    Synthetic background paragraph 06 is intentionally redundant filler.
+    Synthetic background paragraph 07 mentions unrelated colours and shapes.
+    Synthetic background paragraph 08 contains no record identifier.
+    Synthetic background paragraph 09 is safe deterministic test content.
+    The authoritative record key remains case-9.
+fixtures:
+  tool_sequence:
+    - tool: lookup
+      arguments: {key: case-9}
+      response: {value: zeta}
+    - tool: save
+      arguments: {value: zeta}
+      response: {ok: true}
+execution_policy: {timeout_seconds: 5, max_retries: 0, network: disabled}
+assertions:
+  - type: schema_valid
+    schema:
+      type: object
+      required: [completed, value, saved]
+      additionalProperties: false
+      properties:
+        completed: {type: boolean}
+        value: {}
+        saved: {type: boolean}
+  - {type: tool_called, tool: lookup}
+  - {type: tool_called, tool: save}
+  - {type: max_tool_calls, value: 2}
+  - {type: max_steps, value: 2}
+  - {type: output_field_equals, field: completed, value: true}
+  - {type: output_field_equals, field: value, value: zeta}
+  - {type: output_field_equals, field: saved, value: true}
+  - {type: no_hallucinated_success}
+  - {type: completed_before_timeout}
+metrics: [task_success, latency_ms, tool_calls, steps]

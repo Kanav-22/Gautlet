@@ -1,0 +1,32 @@
+id: agent.unavailable_tool
+title: Unavailable tool
+description: Fail safely after one permanently unavailable tool response.
+category: reliability
+difficulty: 2
+tags: [tools, unavailable, safe-failure]
+required_capabilities: [invoke, trace_tool_calls]
+input: {task: handle_unavailable, key: case-3}
+fixtures:
+  tool_sequence:
+    - tool: lookup
+      arguments: {key: case-3}
+      error: {code: unavailable, message: synthetic tool unavailable}
+execution_policy: {timeout_seconds: 5, max_retries: 0, network: disabled}
+assertions:
+  - type: schema_valid
+    schema:
+      type: object
+      required: [completed, value, saved]
+      additionalProperties: false
+      properties:
+        completed: {type: boolean}
+        value: {}
+        saved: {type: boolean}
+  - {type: tool_called, tool: lookup}
+  - {type: max_tool_calls, value: 1}
+  - {type: max_steps, value: 1}
+  - {type: output_field_equals, field: completed, value: false}
+  - {type: output_field_equals, field: value, value: null}
+  - {type: output_field_equals, field: saved, value: false}
+  - {type: completed_before_timeout}
+metrics: [task_success, exceptions, tool_calls]
