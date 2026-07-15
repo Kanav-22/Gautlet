@@ -398,3 +398,92 @@ Fresh environment: `.venv-m4-gate`, created from CPython 3.12.10 after the four 
 ## Blocked
 
 None.
+
+---
+
+## Milestone 5 - Agent MVP Pack and Acceptance
+
+- **Branch:** `codex/m5-mvp-acceptance`
+- **Status:** Ready for Claude review
+- **Authorization:** M5 authorization in `reviews/M4.md`, based on the approved M4 integration commit `f1e2643`
+
+## Work Packages Completed
+
+- **WP-5.1:** Added the packaged `gauntlet.agent.mvp` benchmark with all 15 authorized scenarios, the `agent_mvp_default` scoring policy, and meaningful pass/fail discrimination across all six golden agent variants.
+  - Commit: `ae20b71` (`WP-5.1: add flagship agent MVP benchmark`)
+- **WP-5.2:** Completed `gauntlet evaluate`, static `inspect`, and offline `doctor`; added safe built-in benchmark resolution, project-local root and `src/` callable handling, actual repeat execution, canonical comparison artifacts, evidence-backed finding generation, live-repeat reporting, and documented exit codes.
+  - Commit: `2a454d2` (`WP-5.2: add evaluation CLI and diagnostics`)
+- **WP-5.3:** Added the exact ten-point MVP acceptance suite, committed sample configuration and a real generated redacted report, and documented the tested quickstart and isolation boundary.
+  - Commit: this commit (`WP-5.3: prove MVP acceptance and quickstart`)
+
+## Milestone Gate
+
+Fresh environment: `.venv-m5-gate`, created from CPython 3.12.10 after the complete M5 implementation. Pytest temporary data used unique ignored workspace-owned `.tmp` directories with cache disabled. Neither location is part of this commit.
+
+1. `python -m venv .venv-m5-gate`
+   - Exit code: `0`
+2. `.venv-m5-gate/Scripts/python -m pip install -e ".[dev]"`
+   - Exit code: `0`
+   - Result: built editable `gauntlet-0.1.0` and installed all runtime and development dependencies in the new environment.
+3. `.venv-m5-gate/Scripts/gauntlet --version`
+   - Exit code: `0`
+   - Output: `gauntlet 0.1.0`
+4. `.venv-m5-gate/Scripts/python -m pytest -p no:cacheprovider --basetemp .tmp/m5-fresh-full`
+   - Exit code: `0`
+   - Output: `267 passed in 153.39s` on Windows, Python 3.12.10, pytest 9.1.1.
+5. `.venv-m5-gate/Scripts/python -m ruff check .`
+   - Exit code: `0`
+   - Output: `All checks passed!`
+6. `.venv-m5-gate/Scripts/python -m ruff format --check .`
+   - Exit code: `0`
+   - Output: `76 files already formatted`
+7. `.venv-m5-gate/Scripts/python -m mypy src tests`
+   - Exit code: `0`
+   - Output: `Success: no issues found in 65 source files`
+8. Explicit inherited gate: one real adapter integration, five M3 security checks, and four M4 scoring/comparison checks.
+   - Exit code: `0`
+   - Output: `10 passed in 14.95s`
+9. Benchmark validation CLI:
+   - Flagship pack: exit `0`; output `Valid benchmark gauntlet.agent.mvp version 0.1.0 (schema 1, 15 scenarios)`.
+   - Invalid fixture: explicit PowerShell `$LASTEXITCODE` returned `2`; the actionable error identified the missing manifest `title` field with no traceback.
+10. `gauntlet doctor --artifact-root .tmp/m5-gate-doctor`
+    - Exit code: `0`
+    - Output: seven required checks passed: Python, OS, imports, child process, atomic artifact root, packaged policy, and packaged 15-scenario benchmark.
+11. `gauntlet inspect examples`
+    - Exit code: `0`
+    - Result: detected a Python package, configured and recommended `sample_agent.app:run`, and reported source findings without importing user code.
+12. Real sample evaluation:
+    - Command: `gauntlet evaluate examples --benchmark gauntlet.agent.mvp --seed 42 --repeat 3 --offline --artifact-root .tmp/m5-fresh-demo --verbose`
+    - Exit code: `0`
+    - Output: run `run_20260715_183239_b1f2d1a3`, recommendation `ready`, score `99.16/100`, reproducibility `byte_identical (3 repeats)`, with a Markdown report path printed.
+
+## Ten-Point MVP Acceptance
+
+`.venv-m5-gate/Scripts/python -m pytest -v -p no:cacheprovider --basetemp .tmp/m5-fresh-acceptance tests/test_mvp_acceptance.py` exited `0`: **10 passed in 75.87s**.
+
+1. Fresh-install distribution metadata and the `gauntlet` console entry point passed; the fresh-venv install above is the authoritative installation proof.
+2. Offline `doctor` passed all seven required checks with an explicit writable artifact root.
+3. The packaged flagship benchmark validated as version `0.1.0` with exactly 15 scenarios.
+4. Three separate full correct-agent evaluations completed with 15 passed scenarios, completed manifests, ready recommendations, and all required report artifacts.
+5. The degraded candidate produced critical security findings linked to persisted evidence and back to scenario results.
+6. Manifest, result, scorecard, finding, and canonical JSON validated; every evidence envelope was strict-parsed, filename/hash verified, store-loaded, and linked.
+7. The 15-row Markdown report was generated, disclosed the subprocess boundary, omitted raw fixtures, and redacted a synthetic secret from every persisted artifact.
+8. Three separate deterministic evaluations produced byte-identical `canonical.json` files; each also contained three equal semantic repeats and an evidence-backed `byte_identical` claim.
+9. Replacing one stable adapter target's implementation with the injection-vulnerable variant produced a comparable regression; `gauntlet compare` exited `1`.
+10. The degraded full-pack evaluation exited `1` for policy failure while retaining a completed manifest and every required report artifact.
+
+## Deviations
+
+- Specs `00`-`16` and `reviews/` were not modified. No public plugin discovery, Docker isolation, LLM judge, LangGraph integration, or HTML reporting was implemented.
+- The flagship scenarios use a five-second parent deadline rather than the initially authored two seconds. Two real Windows acceptance passes observed sandboxed child startup/reset times above two seconds, causing false timeouts and non-reproducible correct runs. No spec fixes a two-second value; five seconds is still bounded, and the independent parent-timeout/reap security test remains unchanged and green.
+- M5 extends `reporting/` despite the default constraint because actual repeat execution, ADR-004 canonical output, honest live distributions, evidence-backed findings, source/benchmark fingerprints, and complete-report publication are required by the authorized M5 acceptance gate. `adapters/`, `execution/`, and `scoring/` remain untouched.
+- Canonical adapter identity fingerprints project Python plus bounded prompt/config resource types and rejects installed targets outside the evaluated project. Root and `src/` layouts are supported. This prevents behavior-changing local resources or site-package drift from silently comparing as identical.
+- The M4 `EvaluationRequest.reproducibility` constructor field is retained as a compatibility shim. Supplying it now fails with explicit migration guidance because M5 derives reproducibility only from persisted canonical repeat evidence; callers should configure `repeat >= 2`.
+- Supplied findings cannot cite nonexistent evidence, including by spoofing the reserved reproducibility finding ID. Generated finding links use stable repeat/scenario/role selectors in canonical output.
+- `--offline` means fixture-mode credential/proxy environment isolation, not OS-level socket denial. Subprocess execution remains explicitly documented as process separation rather than a hardened hostile-code sandbox.
+- The committed example report is the actual redacted output from a successful Windows sample run. Its observed latency and platform fields are examples, not performance or cross-platform claims.
+- Scenario 5 models a catchable synthetic tool-timeout response; scenario 11 separately proves a real adapter reset; scenario 15 is stable across externally supplied seeds, while the ADR-004 release claim correctly compares identical configured seeds.
+
+## Blocked
+
+None.
