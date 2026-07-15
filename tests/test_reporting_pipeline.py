@@ -236,7 +236,8 @@ def test_correct_golden_agent_outscores_degraded_and_writes_all_reports(
 
 
 def test_every_persisted_artifact_is_redacted_before_publication(tmp_path: Path) -> None:
-    secret = "never-persist-m4-secret"
+    secret = "secret08"
+    assert len(secret) == 8
     artifact_root = tmp_path / "artifacts"
     pack = loaded_pack(
         tmp_path / "pack",
@@ -281,6 +282,55 @@ def test_every_persisted_artifact_is_redacted_before_publication(tmp_path: Path)
     assert "[REDACTED]" in (run_dir / "results.json").read_text(encoding="utf-8")
     assert "[REDACTED]" in (run_dir / "config.resolved.yaml").read_text(encoding="utf-8")
     assert "[REDACTED]" in (run_dir / "environment.json").read_text(encoding="utf-8")
+
+
+def test_short_secret_named_environment_value_does_not_corrupt_evaluation(
+    tmp_path: Path,
+) -> None:
+    short_value = "20"
+    artifact_root = tmp_path / "artifacts"
+    pack = loaded_pack(
+        tmp_path / "pack",
+        (scenario("short-secret", DimensionName.CORRECTNESS, value=short_value),),
+    )
+    policy = ScoringPolicy(
+        id="correctness-only",
+        weights={DimensionName.CORRECTNESS: 1.0},
+        caps=PolicyCaps(
+            critical_security_finding=49,
+            task_success_below_50_percent=59,
+        ),
+        minimums=PolicyMinimums(scenarios_completed=1),
+    )
+    pipeline = EvaluationPipeline(
+        RunArtifactStore(artifact_root),
+        redaction_environment={"MY_API_KEY": short_value},
+    )
+
+    completed = pipeline.evaluate(
+        request(
+            artifact_root,
+            pack,
+            "sample_agent.variants.correct:run",
+            policy,
+            environment={"diagnostic": short_value},
+        )
+    )
+
+    assert completed.run.status.value == "completed"
+    run_dir = pipeline.run_store.run_dir(completed.run.id)
+    persisted_results = json.loads((run_dir / "results.json").read_text(encoding="utf-8"))
+    expected_result = completed.results[0].model_dump(mode="json")
+    assert persisted_results[0]["started_at"] == expected_result["started_at"]
+    assert persisted_results[0]["finished_at"] == expected_result["finished_at"]
+    assert json.loads((run_dir / "environment.json").read_text(encoding="utf-8")) == {
+        "diagnostic": short_value
+    }
+    evidence_text = [
+        physical_path(path).read_text(encoding="utf-8")
+        for path in (run_dir / "evidence").glob("*.json")
+    ]
+    assert any(f'"value": "{short_value}"' in text for text in evidence_text)
 
 
 class FailingReportStore(RunArtifactStore):

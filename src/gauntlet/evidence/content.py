@@ -27,6 +27,9 @@ if TYPE_CHECKING:
     from gauntlet.execution.executor import ScenarioExecution
 
 REDACTION_MARKER = "[REDACTED]"
+# Short environment values overwhelmingly collide with ordinary dates, counters,
+# and ports; genuine credentials are expected to be at least this long.
+SECRET_LITERAL_MIN_LENGTH = 8
 _EVIDENCE_SCHEMA_VERSION = 1
 _HASH_PATTERN = re.compile(r"^sha256:([0-9a-f]{64})$")
 _SECRET_NAME_PATTERN = re.compile(
@@ -85,7 +88,8 @@ class SecretRedactor:
         values = {
             value
             for name, value in source.items()
-            if value and (_SECRET_NAME_PATTERN.search(name) is not None or name in explicit_names)
+            if len(value) >= SECRET_LITERAL_MIN_LENGTH
+            and (_SECRET_NAME_PATTERN.search(name) is not None or name in explicit_names)
         }
         self._literals = tuple(sorted(values, key=lambda value: (-len(value), value)))
         compiled: list[re.Pattern[str]] = []
