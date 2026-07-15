@@ -9,7 +9,12 @@ from pydantic import JsonValue
 
 from gauntlet.core.models import Finding, FindingSeverity, GauntletModel, ScenarioResult
 from gauntlet.evidence import RunArtifactStore, SecretRedactor
-from gauntlet.reporting.models import ReportArtifacts, ReportContext
+from gauntlet.reporting.canonical import CanonicalEvaluation
+from gauntlet.reporting.models import (
+    ReportArtifacts,
+    ReportContext,
+    ReproducibilityClaim,
+)
 from gauntlet.scoring import ScoringOutcome
 
 ModelT = TypeVar("ModelT", bound=GauntletModel)
@@ -33,6 +38,7 @@ class ReportGenerator:
         scoring: ScoringOutcome,
         findings: Sequence[Finding],
         context: ReportContext,
+        canonical: CanonicalEvaluation,
         redactor: SecretRedactor,
     ) -> ReportArtifacts:
         """Redact every persisted representation and write fixed-name artifacts."""
@@ -46,6 +52,7 @@ class ReportGenerator:
         clean_scoring = _sanitized_model(scoring, ScoringOutcome, redactor)
         clean_findings = tuple(_sanitized_model(finding, Finding, redactor) for finding in findings)
         clean_context = _sanitized_model(context, ReportContext, redactor)
+        clean_canonical = _sanitized_model(canonical, CanonicalEvaluation, redactor)
 
         results_path = self.run_store.write_results(run_id, clean_results)
         scorecard_path = self.run_store.write_scorecard(
@@ -53,6 +60,11 @@ class ReportGenerator:
             clean_scoring.scorecard,
         )
         findings_path = self.run_store.write_findings(run_id, clean_findings)
+        canonical_path = self.run_store.write_json(
+            run_id,
+            "canonical.json",
+            clean_canonical.model_dump(mode="json"),
+        )
         markdown = _render_markdown(
             clean_results,
             clean_scoring,
@@ -67,6 +79,7 @@ class ReportGenerator:
             results=results_path,
             scorecard=scorecard_path,
             findings=findings_path,
+            canonical=canonical_path,
             markdown=markdown_path,
         )
 
@@ -107,6 +120,8 @@ def _render_markdown(
         f"- Confidence: {scoring.scorecard.confidence:.2f}",
         f"- Scoring policy: `{_table_text(scoring.scorecard.policy_id)}`",
         f"- Scenarios completed: {scoring.scenarios_completed}",
+        f"- Repeats completed: {context.reproducibility.repeat_count}",
+        f"- Reproducibility: {_reproducibility_text(context)}",
         f"- Critical risks: {len(high_risk)} high or critical finding(s)",
         "- Major regressions: not assessed (no comparison baseline)",
         "",
@@ -197,6 +212,41 @@ def _render_markdown(
         ]
     )
     return "\n".join(lines)
+
+
+def _reproducibility_text(context: ReportContext) -> str:
+    report = context.reproducibility
+    if report.claim is ReproducibilityClaim.BYTE_IDENTICAL:
+        return f"byte-identical across {report.repeat_count} canonical repeats"
+    if report.claim is ReproducibilityClaim.NON_REPRODUCIBLE:
+        return f"non-reproducible across {report.repeat_count} canonical repeats"
+    if report.claim is ReproducibilityClaim.LIVE_VARIANCE_ONLY:
+        distribution = report.live_distribution
+        if distribution is None:  # pragma: no cover - model invariant
+            raise ReportGenerationError("Live repeat report has no observed distribution")
+        distinct = len(set(distribution.canonical_hashes))
+        latency_min = min(distribution.total_latency_ms)
+        latency_max = max(distribution.total_latency_ms)
+        task_rates = [rate for rate in distribution.task_success_rates if rate is not None]
+        task_text = (
+            f"task success {100 * min(task_rates):.1f}-{100 * max(task_rates):.1f}%"
+            if task_rates
+            else "task success not reported"
+        )
+        cost_text = "cost not reported"
+        if distribution.observed_cost_usd is not None:
+            cost_text = (
+                f"observed cost ${min(distribution.observed_cost_usd):.6f}-"
+                f"${max(distribution.observed_cost_usd):.6f}"
+            )
+        return (
+            f"{distinct} distinct canonical result(s) across {report.repeat_count} "
+            f"live-service repeats; total latency {latency_min}-{latency_max} ms; "
+            f"{task_text}; {cost_text}; no deterministic claim"
+        )
+    if context.execution_mode.value == "live_service":
+        return "not assessed; one live-service repeat is insufficient evidence"
+    return "not assessed; at least two canonical repeats are required"
 
 
 def _metric_text(value: JsonValue | None) -> str:
