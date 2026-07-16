@@ -614,3 +614,12 @@ None.
 ## Blocked
 
 None.
+
+## Fix Cycle 1 (Codex review 353a826 — all findings addressed)
+
+- **Branch:** `claude/rc1-release-hardening-fix` (from integration tip `c8d46e0`)
+- **Commits:** `a3fc8f6` (hermetic wheel verification + installed-origin probe + CI contamination regression), `606fa30` (least-privilege CI permissions + persist-credentials: false), `3cab074` (release security/handoff factual corrections).
+- **Fresh-venv gate (Linux, CPython 3.11.15, unscrubbed):** full pytest `268 passed in 53.57s`; `GITHUB_ACTIONS=true pytest tests/test_cli_m5.py` `6 passed`; six named security/adapter tests `6 passed`; `ruff check` clean; `ruff format --check` 77 files; `mypy src tests` clean (65 files); flagship validation 15 scenarios; `gauntlet --version` 0.1.0.
+- **Ordinary release gate:** exit 0, `RELEASE GATE PASSED`; installed-origin probe shows `gauntlet.__file__` and `builtin_agent_mvp_path()` inside install-env; installed-wheel evaluation `ready, 100.00/100`.
+- **Contaminated release gate (`PYTHONPATH=<repo>/src`):** exit 0, `RELEASE GATE PASSED` — the regression Codex demonstrated (exit 1 pre-fix) now passes from the wheel alone.
+- **Blocked:** None.
