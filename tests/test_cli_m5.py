@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 from pathlib import Path
 
@@ -11,6 +12,13 @@ from gauntlet.cli import app
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 runner = CliRunner()
+_ANSI_ESCAPES = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _plain(output: str) -> str:
+    """Strip ANSI styling so assertions hold when rich force-enables color (CI)."""
+
+    return _ANSI_ESCAPES.sub("", output)
 
 
 def _sample_project(tmp_path: Path) -> Path:
@@ -159,6 +167,7 @@ def test_evaluate_help_lists_every_m5_flag() -> None:
     result = runner.invoke(app, ["evaluate", "--help"])
 
     assert result.exit_code == 0, result.output
+    plain_output = _plain(result.output)
     for option in (
         "--profile",
         "--benchmark",
@@ -170,4 +179,4 @@ def test_evaluate_help_lists_every_m5_flag() -> None:
         "--quiet",
         "--verbose",
     ):
-        assert option in result.output
+        assert option in plain_output
