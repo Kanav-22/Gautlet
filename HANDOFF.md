@@ -593,7 +593,7 @@ None.
 ## CI Results
 
 - Run 1 (`29461736356`, head `94b8e5d`): release gate (ubuntu) passed on the first attempt; all four test-matrix jobs failed on the ANSI help-test issue above; release gate (windows) failed on the short-path issue above. Both diagnosed from the real CI logs and fixed.
-- Run 2 (head `cd63b86`): recorded below after completion; RC1 merges only if fully green.
+- Run 2 (`29462307830`, head `fdab0d2`): **conclusion success** — all six jobs green (test matrix ubuntu/windows x py3.11/3.12 including the full suite, lint, format, type check, flagship validation, and the six named security/adapter tests; plus both release-gate jobs, proving the wheel install end-to-end on Linux and Windows).
 
 ## Deviations
 
