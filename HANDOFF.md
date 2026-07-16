@@ -561,10 +561,15 @@ None.
 
 - **Branch:** `claude/rc1-release-hardening` (from integration tip `17cf790`, the M5 merge)
 - **Role:** Claude/Fable as implementation owner; Codex to review independently.
-- **Commits:**
+- **Commits (all eight RC1 commits, in order):**
   - `37d1448` `CLAUDE-RC.1: add cross-platform release gates`
   - `613fc1e` `CLAUDE-RC.2: prove wheel installation and runtime assets`
   - `5b7ddbf` `CLAUDE-RC.4: document release readiness and security boundaries`
+  - `94b8e5d` `CLAUDE-RC: append RC1 handoff section`
+  - `6f2d9e6` `CLAUDE-RC.3: harden CLI help test against forced ANSI styling`
+  - `cd63b86` `CLAUDE-RC.3: harden release-gate path check for Windows short paths`
+  - `fdab0d2` `CLAUDE-RC: record CI round-1 findings in RC1 handoff`
+  - `84d756d` `CLAUDE-RC: record green CI run in RC1 handoff`
 
 ## Work Completed
 
@@ -577,7 +582,7 @@ None.
 - **Two, both revealed by the first real CI run and fixed with verification:**
   1. `CLAUDE-RC.3` (test hardening): rich force-enables ANSI styling under `GITHUB_ACTIONS`, splitting option names in the `evaluate --help` panel, so `tests/test_cli_m5.py::test_evaluate_help_lists_every_m5_flag` failed on all four CI matrix cells. Reproduced locally with `GITHUB_ACTIONS=true`; fixed by stripping ANSI escapes before asserting. Full suite verified green both with and without `GITHUB_ACTIONS=true` (268 passed each way). No runtime impact.
   2. `CLAUDE-RC.3` (release-gate script): Windows runners mix 8.3 short paths (`RUNNER~1`) and long paths (`runneradmin`) for the same temp directory, so the gate's raw-substring containment check wrongly failed the packaged-pack step on `windows-latest`. Fixed with resolved-path `is_relative_to` comparison; Linux gate re-verified locally, Windows via CI rerun.
-- **Pre-CI audit found none.** The adversarial audit probed: CLI error containment (nonexistent project, unwritable artifact root, unknown benchmark selector — all actionable messages, exit 2, no tracebacks), `--repeat 0` rejection, benchmark manifest `../` and absolute-path escapes (both rejected, exit 2), end-to-end malicious child stdout including fake protocol frames (contained; evaluation completed correctly), and wheel packaging (no defect — the M5 force-include ships the pack; verified by installing and evaluating from the wheel alone). Per instructions, no `CLAUDE-RC.3` commit exists because no reproducible defect was found; no churn was manufactured.
+- **The pre-CI adversarial audit found no runtime defect.** It probed: CLI error containment (nonexistent project, unwritable artifact root, unknown benchmark selector — all actionable messages, exit 2, no tracebacks), `--repeat 0` rejection, benchmark manifest `../` and absolute-path escapes (both rejected, exit 2), end-to-end malicious child stdout including fake protocol frames (contained; evaluation completed correctly), and wheel packaging (no defect — the M5 force-include ships the pack; verified by installing and evaluating from the wheel alone). **CI then found the two release-infrastructure defects above** — a test-only environment sensitivity and a gate-script path-comparison error — which is why the two `CLAUDE-RC.3` commits (`6f2d9e6`, `cd63b86`) exist. Neither is a runtime defect in GAUNTLET itself.
 - One documented behavior (not fixed, by design): an artifact root placed inside the evaluated project makes repeat runs exit 4 because run artifacts legitimately change the project fingerprint. Recorded as a known limitation in the release document.
 
 ## Local Gate Results (Linux, CPython 3.11.15, unscrubbed host environment)
@@ -597,7 +602,7 @@ None.
 
 ## Deviations
 
-- No `CLAUDE-RC.3` commit: the audit found no reproducible defect to fix (documented above), and fabricating changes was explicitly prohibited.
+- The two `CLAUDE-RC.3` commits fix release-infrastructure defects revealed by the first CI run, not runtime defects; the pre-CI audit alone would have produced none.
 - `scripts/` is not added to the mypy `files` list to avoid touching shared configuration; the release-gate script is fully typed and ruff/format-clean regardless.
 
 ## Known Remaining Risks

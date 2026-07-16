@@ -11,7 +11,9 @@ transcript in `HANDOFF.md`, or a review record in `reviews/`.
   15-scenario `gauntlet.agent.mvp` benchmark in an isolated child process with
   deterministic stubbed tools, and produces `results.json`, `scorecard.json`,
   `findings.json`, `canonical.json`, and a human-readable `report.md` under a
-  run directory outside the project source.
+  run directory that is outside the project source by default (the artifact
+  root is overridable; placing it inside the project makes repeat runs fail
+  closed, as documented under known risks).
 - Scores are policy-driven (`agent_mvp_default`: weighted dimensions, security
   caps, scenario minimums) and every applied rule is cited in the scorecard.
   Release recommendations are `ready`, `ready_with_warnings`, `not_ready`, or
@@ -57,8 +59,11 @@ Every milestone was implemented by one agent (Codex) and gated by a second
   sandbox (container/VM).
 - **`--offline` and `network: disabled` are environment isolation, not socket
   denial.** The child receives a minimal allowlisted environment (no proxy
-  settings, API keys, or credentials), so accidental network use fails — but
-  code that hardcodes endpoints can still open sockets. OS-level network
+  settings, API keys, or credentials), so calls that depend on inherited
+  credentials or proxy configuration lose that configuration — but **all
+  socket access remains possible**: an unauthenticated public request, a URL
+  supplied in scenario input, or any hard-coded endpoint can still connect
+  unless an external firewall, container, or VM blocks it. OS-level network
   denial is deferred (Docker isolation is post-MVP).
 - The child's stdout is reserved for the framed JSONL protocol; agent prints
   and tracebacks are redirected to captured, bounded stderr. Malicious or
@@ -90,9 +95,9 @@ Every milestone was implemented by one agent (Codex) and gated by a second
   fail with exit 4 ("evaluated source changed") because run artifacts change
   the project fingerprint. This is honest fail-closed behavior; keep the
   artifact root outside the project (the default already is).
-- Windows coverage in CI uses GitHub-hosted runners; the Codex-sandbox ACL
-  issues encountered during development are environment-specific and do not
-  affect end users.
+- Windows coverage in CI uses GitHub-hosted runners; the ACL failures
+  encountered during development were not reproduced outside the Codex
+  Windows sandbox environment, and no end-user report of them exists.
 - macOS is untested (expected to behave like Linux; both POSIX paths are
   exercised), and the scoring normalization curves/recommendation bands are
   project-defined defaults recorded in the policy file, not spec-mandated.
@@ -121,10 +126,13 @@ Python 3.11/3.12 plus the release gate on both OSes.
 **Ready for an initial (0.1.0) release**, with the trust boundaries above
 stated in the release notes. Evidence: 268 passing tests including the
 10-point MVP acceptance suite on two operating systems and two Python
-versions; an executed wheel-installation gate; five milestone reviews with
-independent second-OS verification; and an RC1 adversarial audit that probed
-subprocess lifecycle, environment isolation, redaction, path containment,
-protocol corruption, CLI error handling, and comparison honesty **without
-finding a reproducible defect**. The two defects found earlier in
-development were both caught by this process and carry regression tests.
-Remaining risks are documented limitations, not unknowns.
+versions; an executed wheel-installation gate; six milestone reviews
+(M0 through M5) with independent second-OS verification; and an RC1
+adversarial audit that probed subprocess lifecycle, environment isolation,
+redaction, path containment, protocol corruption, CLI error handling, and
+comparison honesty **without finding a reproducible runtime defect**. The
+first real CI run then exposed two release-infrastructure defects (a
+test-only ANSI sensitivity and a gate-script path comparison), both fixed
+with regression verification — as were the two runtime defects caught by
+second-OS review earlier in development. Known remaining risks are
+documented above.
