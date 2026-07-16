@@ -8,8 +8,12 @@ actually work for a user?" It never touches the source tree at runtime:
    `gauntlet` console entry point, the packaged `agent_mvp_default` scoring
    policy, and all 15 flagship benchmark scenarios.
 3. Create a brand-new virtual environment and install ONLY the built wheel.
-4. From that environment, with the source tree deliberately absent from
-   `sys.path` and the working directory, run:
+4. From that environment — under a hermetic runtime environment that strips
+   inherited `PYTHONPATH`/`PYTHONHOME`, sets `PYTHONNOUSERSITE=1`, and runs
+   from a neutral working directory so the source checkout can never satisfy
+   an import or asset lookup — run:
+   - an installed-origin probe proving `gauntlet.__file__` and
+     `builtin_agent_mvp_path()` both resolve inside the install environment
    - `gauntlet --version`
    - `gauntlet doctor` (offline environment checks, packaged assets)
    - `gauntlet benchmark validate` on the packaged flagship pack
@@ -17,10 +21,14 @@ actually work for a user?" It never touches the source tree at runtime:
 
 Exit code 0 means every step passed; any failure exits non-zero with the
 failing step's real output. No step may be skipped or its failure hidden.
+The gate must pass even when the parent process carries a hostile
+`PYTHONPATH` pointing at the repository `src/` tree; CI runs that
+contamination regression explicitly.
 """
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -110,13 +118,35 @@ scoring:
 """
 
 
-def run_step(name: str, command: list[str], *, cwd: Path) -> str:
+def hermetic_runtime_env() -> dict[str, str]:
+    """Return the parent environment stripped of Python import-path leakage.
+
+    Inherited ``PYTHONPATH``/``PYTHONHOME`` could let the source checkout (or
+    anything else on the host) satisfy imports that must come from the
+    installed wheel, and user site-packages could shadow wheel contents.
+    """
+
+    environment = dict(os.environ)
+    environment.pop("PYTHONPATH", None)
+    environment.pop("PYTHONHOME", None)
+    environment["PYTHONNOUSERSITE"] = "1"
+    return environment
+
+
+def run_step(
+    name: str,
+    command: list[str],
+    *,
+    cwd: Path,
+    env: dict[str, str] | None = None,
+) -> str:
     """Run one gate step, echo its outcome, and fail loudly on error."""
 
     print(f"--- {name} ---", flush=True)
     completed = subprocess.run(
         command,
         cwd=cwd,
+        env=env,
         capture_output=True,
         text=True,
         check=False,
@@ -219,15 +249,64 @@ def main() -> None:
         venv.create(install_env_dir, with_pip=True)
         install_python = _venv_python(install_env_dir)
         gauntlet_cli = _venv_executable(install_env_dir, "gauntlet")
+        runtime_env = hermetic_runtime_env()
         run_step(
             "install built wheel into a clean environment",
             [str(install_python), "-m", "pip", "install", "--quiet", str(wheels[0])],
             cwd=workspace,
+            env=runtime_env,
         )
 
-        # Every remaining step runs from the temporary workspace so the source
-        # checkout can never satisfy an import or asset lookup by accident.
-        run_step("gauntlet --version", [str(gauntlet_cli), "--version"], cwd=workspace)
+        # Every remaining step runs from the temporary workspace under the
+        # hermetic environment so the source checkout can never satisfy an
+        # import or asset lookup, deliberately or by accident.
+        install_root = install_env_dir.resolve()
+        origin_probe = subprocess.run(
+            [
+                str(install_python),
+                "-c",
+                "import gauntlet;"
+                "from gauntlet.benchmarks.builtin import builtin_agent_mvp_path;"
+                "print(gauntlet.__file__);"
+                "print(builtin_agent_mvp_path())",
+            ],
+            cwd=workspace,
+            env=runtime_env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        print("--- installed-origin probe ---", flush=True)
+        if origin_probe.returncode != 0:
+            print(origin_probe.stdout + origin_probe.stderr)
+            print("RELEASE GATE FAILED at step: installed-origin probe")
+            raise SystemExit(1)
+        probe_lines = origin_probe.stdout.strip().splitlines()
+        if len(probe_lines) != 2:
+            print(origin_probe.stdout)
+            print("RELEASE GATE FAILED at step: installed-origin probe")
+            raise SystemExit(1)
+        module_origin = Path(probe_lines[0]).resolve()
+        # Resolve both sides: Windows runners mix 8.3 short paths (RUNNER~1)
+        # with long paths (runneradmin) for the same temp directory.
+        packaged_path = Path(probe_lines[1]).resolve()
+        for label, resolved in (
+            ("gauntlet.__file__", module_origin),
+            ("builtin_agent_mvp_path()", packaged_path),
+        ):
+            if not resolved.is_relative_to(install_root):
+                print(f"{label} resolved outside the wheel install: {resolved}")
+                print("RELEASE GATE FAILED at step: installed-origin probe")
+                raise SystemExit(1)
+        print(f"gauntlet imports from {module_origin}", flush=True)
+        print(f"flagship pack resolves to {packaged_path}", flush=True)
+
+        run_step(
+            "gauntlet --version",
+            [str(gauntlet_cli), "--version"],
+            cwd=workspace,
+            env=runtime_env,
+        )
         run_step(
             "gauntlet doctor",
             [
@@ -237,34 +316,13 @@ def main() -> None:
                 str(workspace / "doctor-root"),
             ],
             cwd=workspace,
+            env=runtime_env,
         )
-        packaged_pack = subprocess.run(
-            [
-                str(install_python),
-                "-c",
-                "from gauntlet.benchmarks.builtin import builtin_agent_mvp_path;"
-                "print(builtin_agent_mvp_path())",
-            ],
-            cwd=workspace,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if packaged_pack.returncode != 0:
-            print(packaged_pack.stdout + packaged_pack.stderr)
-            print("RELEASE GATE FAILED at step: resolve packaged flagship pack")
-            raise SystemExit(1)
-        # Resolve both sides: Windows runners mix 8.3 short paths (RUNNER~1)
-        # with long paths (runneradmin) for the same temp directory.
-        packaged_path = Path(packaged_pack.stdout.strip()).resolve()
-        if not packaged_path.is_relative_to(install_env_dir.resolve()):
-            print(f"packaged pack resolved outside the wheel install: {packaged_path}")
-            print("RELEASE GATE FAILED at step: resolve packaged flagship pack")
-            raise SystemExit(1)
         run_step(
             "validate packaged flagship benchmark",
             [str(gauntlet_cli), "benchmark", "validate", str(packaged_path)],
             cwd=workspace,
+            env=runtime_env,
         )
 
         project, pack, artifacts = write_smoke_workspace(workspace)
@@ -283,6 +341,7 @@ def main() -> None:
                 str(artifacts),
             ],
             cwd=workspace,
+            env=runtime_env,
         )
         if "ready" not in output:
             print("sample evaluation did not reach a ready recommendation")
