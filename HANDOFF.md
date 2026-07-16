@@ -554,3 +554,54 @@ Fresh environment: `.venv-m5-gate`, created from CPython 3.12.10 after the compl
 ## Blocked
 
 None.
+
+---
+
+## Claude/Fable RC1 - Release Hardening
+
+- **Branch:** `claude/rc1-release-hardening` (from integration tip `17cf790`, the M5 merge)
+- **Role:** Claude/Fable as implementation owner; Codex to review independently.
+- **Commits:**
+  - `37d1448` `CLAUDE-RC.1: add cross-platform release gates`
+  - `613fc1e` `CLAUDE-RC.2: prove wheel installation and runtime assets`
+  - `5b7ddbf` `CLAUDE-RC.4: document release readiness and security boundaries`
+
+## Work Completed
+
+- **RC.1:** `.github/workflows/ci.yml` — test matrix (ubuntu/windows x Python 3.11/3.12: editable install, full pytest, ruff check, format check, strict mypy, `gauntlet --version`, flagship benchmark validation, six named security/adapter tests as a dedicated visible step) plus a `release-gate` job on both OSes.
+- **RC.2:** `scripts/release_gate.py` — builds wheel + sdist, statically verifies wheel runtime assets (entry point, packaged policy, 15 flagship scenarios), installs only the wheel into a clean venv, and runs version/doctor/packaged-pack validation plus a bounded offline sample evaluation of a generated throwaway project from a neutral working directory.
+- **RC.4:** `docs/release/RELEASE_READINESS_AND_SECURITY.md` — capabilities, verification record, trust boundaries, redaction/integrity design, known risks, pre-release command set, and the release verdict.
+
+## Genuine Bugs Found and Fixed
+
+- **None in RC1.** The adversarial audit probed: CLI error containment (nonexistent project, unwritable artifact root, unknown benchmark selector — all actionable messages, exit 2, no tracebacks), `--repeat 0` rejection, benchmark manifest `../` and absolute-path escapes (both rejected, exit 2), end-to-end malicious child stdout including fake protocol frames (contained; evaluation completed correctly), and wheel packaging (no defect — the M5 force-include ships the pack; verified by installing and evaluating from the wheel alone). Per instructions, no `CLAUDE-RC.3` commit exists because no reproducible defect was found; no churn was manufactured.
+- One documented behavior (not fixed, by design): an artifact root placed inside the evaluated project makes repeat runs exit 4 because run artifacts legitimately change the project fingerprint. Recorded as a known limitation in the release document.
+
+## Local Gate Results (Linux, CPython 3.11.15, unscrubbed host environment)
+
+- `python -m pytest -p no:cacheprovider`: exit 0 — `268 passed in 47.03s`
+- `ruff check .`: exit 0 — `All checks passed!`
+- `ruff format --check .`: exit 0 — `77 files already formatted`
+- `mypy src tests`: exit 0 — `Success: no issues found in 65 source files`
+- `gauntlet --version`: exit 0 — `gauntlet 0.1.0`
+- `gauntlet benchmark validate benchmarks/agent_mvp`: exit 0 — 15 scenarios
+- `python scripts/release_gate.py`: exit 0 — `RELEASE GATE PASSED`; sample evaluation from the installed wheel completed `ready, score 100.00/100`
+
+## CI Results
+
+- Recorded after push; see the CI section appended below (or the PR checks) for the actual run outcome. CI must be green before RC1 merges to the integration branch.
+
+## Deviations
+
+- No `CLAUDE-RC.3` commit: the audit found no reproducible defect to fix (documented above), and fabricating changes was explicitly prohibited.
+- `scripts/` is not added to the mypy `files` list to avoid touching shared configuration; the release-gate script is fully typed and ruff/format-clean regardless.
+
+## Known Remaining Risks
+
+- macOS untested (POSIX code paths are exercised on Linux).
+- Subprocess isolation is a failure boundary, not a hostile-code sandbox; `--offline` is environment isolation, not socket denial (both documented in the release document and reports).
+- Windows CI runs on GitHub-hosted runners; local Windows development environments with sandbox ACL restrictions may need pytest temp redirection as documented in earlier milestones.
+
+## Blocked
+
+None.
