@@ -574,7 +574,10 @@ None.
 
 ## Genuine Bugs Found and Fixed
 
-- **None in RC1.** The adversarial audit probed: CLI error containment (nonexistent project, unwritable artifact root, unknown benchmark selector — all actionable messages, exit 2, no tracebacks), `--repeat 0` rejection, benchmark manifest `../` and absolute-path escapes (both rejected, exit 2), end-to-end malicious child stdout including fake protocol frames (contained; evaluation completed correctly), and wheel packaging (no defect — the M5 force-include ships the pack; verified by installing and evaluating from the wheel alone). Per instructions, no `CLAUDE-RC.3` commit exists because no reproducible defect was found; no churn was manufactured.
+- **Two, both revealed by the first real CI run and fixed with verification:**
+  1. `CLAUDE-RC.3` (test hardening): rich force-enables ANSI styling under `GITHUB_ACTIONS`, splitting option names in the `evaluate --help` panel, so `tests/test_cli_m5.py::test_evaluate_help_lists_every_m5_flag` failed on all four CI matrix cells. Reproduced locally with `GITHUB_ACTIONS=true`; fixed by stripping ANSI escapes before asserting. Full suite verified green both with and without `GITHUB_ACTIONS=true` (268 passed each way). No runtime impact.
+  2. `CLAUDE-RC.3` (release-gate script): Windows runners mix 8.3 short paths (`RUNNER~1`) and long paths (`runneradmin`) for the same temp directory, so the gate's raw-substring containment check wrongly failed the packaged-pack step on `windows-latest`. Fixed with resolved-path `is_relative_to` comparison; Linux gate re-verified locally, Windows via CI rerun.
+- **Pre-CI audit found none.** The adversarial audit probed: CLI error containment (nonexistent project, unwritable artifact root, unknown benchmark selector — all actionable messages, exit 2, no tracebacks), `--repeat 0` rejection, benchmark manifest `../` and absolute-path escapes (both rejected, exit 2), end-to-end malicious child stdout including fake protocol frames (contained; evaluation completed correctly), and wheel packaging (no defect — the M5 force-include ships the pack; verified by installing and evaluating from the wheel alone). Per instructions, no `CLAUDE-RC.3` commit exists because no reproducible defect was found; no churn was manufactured.
 - One documented behavior (not fixed, by design): an artifact root placed inside the evaluated project makes repeat runs exit 4 because run artifacts legitimately change the project fingerprint. Recorded as a known limitation in the release document.
 
 ## Local Gate Results (Linux, CPython 3.11.15, unscrubbed host environment)
@@ -589,7 +592,8 @@ None.
 
 ## CI Results
 
-- Recorded after push; see the CI section appended below (or the PR checks) for the actual run outcome. CI must be green before RC1 merges to the integration branch.
+- Run 1 (`29461736356`, head `94b8e5d`): release gate (ubuntu) passed on the first attempt; all four test-matrix jobs failed on the ANSI help-test issue above; release gate (windows) failed on the short-path issue above. Both diagnosed from the real CI logs and fixed.
+- Run 2 (head `cd63b86`): recorded below after completion; RC1 merges only if fully green.
 
 ## Deviations
 
