@@ -254,8 +254,10 @@ def main() -> None:
             print(packaged_pack.stdout + packaged_pack.stderr)
             print("RELEASE GATE FAILED at step: resolve packaged flagship pack")
             raise SystemExit(1)
-        packaged_path = Path(packaged_pack.stdout.strip())
-        if str(install_env_dir) not in str(packaged_path):
+        # Resolve both sides: Windows runners mix 8.3 short paths (RUNNER~1)
+        # with long paths (runneradmin) for the same temp directory.
+        packaged_path = Path(packaged_pack.stdout.strip()).resolve()
+        if not packaged_path.is_relative_to(install_env_dir.resolve()):
             print(f"packaged pack resolved outside the wheel install: {packaged_path}")
             print("RELEASE GATE FAILED at step: resolve packaged flagship pack")
             raise SystemExit(1)
